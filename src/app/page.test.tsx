@@ -100,7 +100,7 @@ describe("DDO landing page", () => {
         "Development:Risk Analytics",
         "Development:bus-finance",
         "Optimization:Flyer Bot",
-        "Optimization:PACE",
+        "Optimization:Interactive information avatar",
       ]),
     );
 

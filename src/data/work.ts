@@ -62,8 +62,8 @@ export const pillars: PillarBlock[] = [
         summary: "One input turns into a flyer, social post, and email across channels.",
       },
       {
-        name: "PACE",
-        summary: "Better internal knowledge flow, notes, and voice-driven workflows.",
+        name: "Interactive information avatar",
+        summary: "A voice-friendly guide that helps people ask questions and find useful information faster.",
       },
     ],
   },
@@ -94,10 +94,10 @@ export const selectedWork: WorkItem[] = [
       "Transforms recurring outreach work into a smoother path across print, social, and email formats.",
   },
   {
-    title: "PACE",
+    title: "Interactive information avatar",
     pillar: "Optimization",
-    summary: "Internal tools for faster notes, recall, and team context.",
+    summary: "A conversational guide for faster answers and clearer next steps.",
     detail:
-      "A practical layer for capturing what happened, finding what matters, and reducing the manual follow-up loop.",
+      "An interactive voice and information avatar that turns scattered knowledge into a simpler ask-and-answer experience.",
   },
 ];
