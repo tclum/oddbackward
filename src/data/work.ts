@@ -62,7 +62,7 @@ export const pillars: PillarBlock[] = [
         summary: "One input turns into a flyer, social post, and email across channels.",
       },
       {
-        name: "PACE intelligence and voice tooling",
+        name: "PACE",
         summary: "Better internal knowledge flow, notes, and voice-driven workflows.",
       },
     ],
@@ -94,7 +94,7 @@ export const selectedWork: WorkItem[] = [
       "Transforms recurring outreach work into a smoother path across print, social, and email formats.",
   },
   {
-    title: "PACE intelligence and voice tooling",
+    title: "PACE",
     pillar: "Optimization",
     summary: "Internal tools for faster notes, recall, and team context.",
     detail:

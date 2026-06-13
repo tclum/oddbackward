@@ -5,9 +5,10 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import Home from "@/app/page";
+import { metadata } from "@/app/layout";
 import { RevealToggle } from "@/components/RevealToggle";
 import { siteConfig } from "@/config/site";
-import { selectedWork } from "@/data/work";
+import { pillars, selectedWork } from "@/data/work";
 
 function renderHome() {
   render(React.createElement(Home));
@@ -79,6 +80,36 @@ describe("DDO landing page", () => {
     ).toBe(true);
   });
 
+  it("keeps required brand, legal, and proof config values explicit", () => {
+    expect(siteConfig.brandName).toBe("DDO");
+    expect(siteConfig.legalName).toBe("DDO");
+    expect(siteConfig.legalName).not.toMatch(/\bLLC\b/i);
+    expect(siteConfig.contactEmail).toBe("tclum@forpono.com");
+    expect(siteConfig.contactEmail).not.toBe("timothy@forpono.com");
+    expect(siteConfig.urls.forpono).toBe("https://forpono.com");
+    expect(siteConfig.urls.founder).toBe("https://tclum.forpono.com");
+    expect(siteConfig.urls.riskAnalytics).toBe("https://risk.forpono.com");
+
+    const proofEntries = pillars.flatMap((pillar) =>
+      pillar.proofs.map((proof) => `${pillar.pillar}:${proof.name}`),
+    );
+
+    expect(proofEntries).toEqual(
+      expect.arrayContaining([
+        "Design:Forpono",
+        "Development:Risk Analytics",
+        "Development:bus-finance",
+        "Optimization:Flyer Bot",
+        "Optimization:PACE",
+      ]),
+    );
+
+    for (const pillar of pillars) {
+      expect(pillar.proofs.length).toBeGreaterThanOrEqual(1);
+      expect(pillar.proofs.length).toBeLessThanOrEqual(3);
+    }
+  });
+
   it("keeps configured URLs and email out of components", () => {
     const filesToCheck = [
       "src/app/page.tsx",
@@ -119,7 +150,11 @@ describe("DDO landing page", () => {
     renderHome();
 
     const visibleText = document.body.textContent ?? "";
-    expect(visibleText).not.toMatch(/\bLLC\b/i);
-    expect(visibleText).not.toMatch(/\bAI\b/);
+    const metadataText = [metadata.title, metadata.description].join(" ");
+    const combinedCustomerText = `${visibleText} ${metadataText}`;
+
+    expect(combinedCustomerText).not.toMatch(/\bLLC\b/i);
+    expect(combinedCustomerText).not.toMatch(/\bAI\b/);
+    expect(screen.getByText(`© ${new Date().getFullYear()} DDO`)).toBeInTheDocument();
   });
 });

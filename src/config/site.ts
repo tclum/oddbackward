@@ -1,6 +1,6 @@
 export const siteConfig = {
   brandName: "DDO",
-  legalName: "Timothy C. Lum",
+  legalName: "DDO",
   domain: "oddbackward.com",
   contactEmail: "tclum@forpono.com",
   urls: {
