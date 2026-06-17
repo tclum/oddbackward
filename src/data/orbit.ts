@@ -86,7 +86,7 @@ const centerNode: OrbitNode = {
   accent: "var(--color-brass)",
   kicker: "The studio",
   title: "Design. Development. Optimization.",
-  copy: "A little odd, on purpose — custom websites, apps, and automation for small businesses and teams.",
+  copy: "Websites, apps, and automation for small teams.",
   chips: pillars.map((pillar) => pillar.pillar),
   proofs: [],
   work: [],
@@ -109,12 +109,12 @@ const centerNode: OrbitNode = {
   ],
   pairs: [
     {
-      heading: "DDO is run by Timothy Lum.",
-      body: "One person, senior-level attention, and a preference for useful things over loud things.",
+      heading: "Run by Timothy Lum.",
+      body: "One person. Senior attention. Less noise.",
     },
     {
-      heading: "Bring the messy version. We can shape it from there.",
-      body: "Send a note about what you are trying to make, fix, or simplify.",
+      heading: "Send the rough version.",
+      body: "What you are making, fixing, or simplifying.",
     },
   ],
   image: {

@@ -50,10 +50,8 @@ describe("DDO Hawaii Orbit", () => {
     expect(
       within(dialog).getByRole("link", { name: "Need a website? Visit Forpono" }),
     ).toBeInTheDocument();
-    expect(within(dialog).getByText("DDO is run by Timothy Lum.")).toBeInTheDocument();
-    expect(
-      within(dialog).getByText("Bring the messy version. We can shape it from there."),
-    ).toBeInTheDocument();
+    expect(within(dialog).getByText("Run by Timothy Lum.")).toBeInTheDocument();
+    expect(within(dialog).getByText("Send the rough version.")).toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: /close/i }));
 
     // Each pillar panel: its one-liner (statement) + its proofs.

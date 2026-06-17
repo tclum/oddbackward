@@ -25,45 +25,45 @@ export type WorkItem = {
 export const pillars: PillarBlock[] = [
   {
     pillar: "Design",
-    statement: "Websites and brand-facing design that look like you, not a template.",
+    statement: "Sites that fit the business.",
     proofs: [
       {
         name: "Forpono",
-        summary: "A focused website path for small teams that need a clear place to start.",
+        summary: "A website starting point for small teams.",
         urlKey: "forpono",
       },
       {
         name: "Select work",
-        summary: "A flexible slot for the next owner-approved case study.",
+        summary: "Reserved for the next approved case study.",
       },
     ],
   },
   {
     pillar: "Development",
-    statement: "Custom apps, dashboards, and data tools built around your actual workflow.",
+    statement: "Apps, dashboards, and tools for the real workflow.",
     proofs: [
       {
         name: "Risk Analytics",
-        summary: "Decision-support analytics built on large public safety datasets.",
+        summary: "Analytics for public safety risk data.",
         urlKey: "riskAnalytics",
       },
       {
         name: "bus-finance",
-        summary: "An autonomous finance agent shaped around practical planning work.",
+        summary: "Finance planning for everyday decisions.",
       },
     ],
   },
   {
     pillar: "Optimization",
-    statement: "The repetitive work you do every day, made to run smoother - or run itself.",
+    statement: "Routine work, made lighter or automatic.",
     proofs: [
       {
         name: "Flyer Bot",
-        summary: "One input turns into a flyer, social post, and email across channels.",
+        summary: "One input. Flyer, post, email.",
       },
       {
         name: "Interactive information avatar",
-        summary: "A voice-friendly guide that helps people ask questions and find useful information faster.",
+        summary: "A voice guide for questions and answers.",
       },
     ],
   },
@@ -73,31 +73,27 @@ export const selectedWork: WorkItem[] = [
   {
     title: "Forpono",
     pillar: "Design",
-    summary: "A clear website starting point for small teams.",
-    detail:
-      "Positioning, structure, and practical web presence for owners who need something useful before they need something sprawling.",
+    summary: "Website launch point for small teams.",
+    detail: "Positioning, structure, and a usable web presence.",
     urlKey: "forpono",
   },
   {
     title: "Risk Analytics",
     pillar: "Development",
-    summary: "Decision-support tools for complex public datasets.",
-    detail:
-      "A focused analytics experience that helps people explore risk signals without needing to become data engineers first.",
+    summary: "Decision tools for public datasets.",
+    detail: "Risk signals in one place, without extra data work.",
     urlKey: "riskAnalytics",
   },
   {
     title: "Flyer Bot",
     pillar: "Optimization",
-    summary: "A repeatable promotion workflow from one clean input.",
-    detail:
-      "Transforms recurring outreach work into a smoother path across print, social, and email formats.",
+    summary: "Promotion from one clean input.",
+    detail: "Flyer, social post, and email from the same source.",
   },
   {
     title: "Interactive information avatar",
     pillar: "Optimization",
-    summary: "A conversational guide for faster answers and clearer next steps.",
-    detail:
-      "An interactive voice and information avatar that turns scattered knowledge into a simpler ask-and-answer experience.",
+    summary: "A voice guide for questions and next steps.",
+    detail: "Scattered knowledge in an ask-and-answer flow.",
   },
 ];

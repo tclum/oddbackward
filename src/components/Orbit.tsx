@@ -215,7 +215,7 @@ export function Orbit({ nodes, pillarIds, dock = "right" }: OrbitProps) {
                 onClick={() => openNode(center)}
               >
                 <span className="sr-only" aria-live="polite">
-                  {locked ? `${order} — DDO, backwards` : order}
+                  {locked ? `${order}. DDO, backwards.` : order}
                 </span>
                 <span className="core-label" aria-hidden="true">
                   Center
@@ -229,7 +229,7 @@ export function Orbit({ nodes, pillarIds, dock = "right" }: OrbitProps) {
                 </strong>
                 {locked ? (
                   <span className="core-caption" aria-hidden="true">
-                    yes — DDO, backwards
+                    DDO, backwards.
                   </span>
                 ) : null}
               </button>
@@ -275,7 +275,7 @@ export function Orbit({ nodes, pillarIds, dock = "right" }: OrbitProps) {
               }}
               onClick={closePanel}
             >
-              <span className="sr-only">Close {node.nodeLabel} details</span>
+              <span className="sr-only">Close {node.nodeLabel}</span>
             </button>
 
             <p className="panel-kicker">{node.kicker}</p>
