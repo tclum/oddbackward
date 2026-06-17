@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import type { OrbitNode } from "@/data/orbit";
+import { resolvePortfolio } from "@/data/portfolio";
 
 type OrbitProps = {
   nodes: OrbitNode[];
@@ -14,6 +15,9 @@ type OrbitProps = {
 type LetterOrder = "DDO" | "DOD" | "ODD";
 
 const INTERMEDIATE_ORDERS: LetterOrder[] = ["DDO", "DOD"];
+
+// Three letter-slots, echoing the three-glyph wordmark / 3-letter portfolio codes.
+const CODE_LENGTH = 3;
 
 function prefersReducedMotion(): boolean {
   return (
@@ -43,11 +47,22 @@ export function Orbit({ nodes, pillarIds, dock = "right" }: OrbitProps) {
   const [locked, setLocked] = useState(false);
   const [shuffling, setShuffling] = useState(false);
 
+  // Portfolio-code easter egg — gated entirely on the `locked` latch (the ODD
+  // reveal). No parallel "all opened" tracker.
+  const [codeOpen, setCodeOpen] = useState(false);
+  const [slots, setSlots] = useState<string[]>(() => Array(CODE_LENGTH).fill(""));
+  const [codeFeedback, setCodeFeedback] = useState("");
+  const [shaking, setShaking] = useState(false);
+
   const triggerRefs = useRef(new Map<string, HTMLButtonElement | null>());
   const closeRefs = useRef(new Map<string, HTMLButtonElement | null>());
   const panelRefs = useRef(new Map<string, HTMLElement | null>());
   const lastTriggerId = useRef<string | null>(null);
   const shuffleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const codeTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const codeOverlayRef = useRef<HTMLDivElement | null>(null);
+  const slotRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const shakeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => setMounted(true), []);
   useEffect(() => () => {
@@ -137,11 +152,9 @@ export function Orbit({ nodes, pillarIds, dock = "right" }: OrbitProps) {
     return () => window.removeEventListener("keydown", onKey);
   }, [openId, closePanel]);
 
-  function onPanelKeyDown(event: React.KeyboardEvent<HTMLElement>) {
-    if (event.key !== "Tab") return;
-    const panel = panelRefs.current.get(openId ?? "");
-    if (!panel) return;
-    const focusables = focusableWithin(panel);
+  function trapTab(event: React.KeyboardEvent<HTMLElement>, root: HTMLElement | null) {
+    if (event.key !== "Tab" || !root) return;
+    const focusables = focusableWithin(root);
     if (focusables.length === 0) return;
     const first = focusables[0];
     const last = focusables[focusables.length - 1];
@@ -155,12 +168,110 @@ export function Orbit({ nodes, pillarIds, dock = "right" }: OrbitProps) {
     }
   }
 
+  function onPanelKeyDown(event: React.KeyboardEvent<HTMLElement>) {
+    trapTab(event, panelRefs.current.get(openId ?? "") ?? null);
+  }
+
+  // ---- portfolio-code overlay ----
+
+  const openCode = useCallback(() => {
+    setCodeFeedback("");
+    setSlots(Array(CODE_LENGTH).fill(""));
+    setCodeOpen(true);
+  }, []);
+
+  const closeCode = useCallback(() => setCodeOpen(false), []);
+
+  const submitCode = useCallback((value: string) => {
+    const match = resolvePortfolio(value);
+    if (match) {
+      setCodeFeedback(`opening ${match.name}'s portfolio`);
+      window.open(match.portfolioUrl, "_blank", "noopener,noreferrer");
+      return;
+    }
+    setCodeFeedback("not quite");
+    setSlots(Array(CODE_LENGTH).fill(""));
+    if (!prefersReducedMotion()) {
+      setShaking(true);
+      if (shakeTimer.current) clearTimeout(shakeTimer.current);
+      shakeTimer.current = setTimeout(() => setShaking(false), 420);
+    }
+    slotRefs.current[0]?.focus({ preventScroll: true });
+  }, []);
+
+  function onSlotChange(index: number, raw: string) {
+    const ch = raw.slice(-1).toLowerCase().replace(/[^a-z]/g, "");
+    const next = [...slots];
+    next[index] = ch;
+    setSlots(next);
+    if (ch && index < CODE_LENGTH - 1) {
+      slotRefs.current[index + 1]?.focus({ preventScroll: true });
+    } else if (ch && index === CODE_LENGTH - 1 && next.every(Boolean)) {
+      submitCode(next.join(""));
+    }
+  }
+
+  function onSlotKeyDown(index: number, event: React.KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      submitCode(slots.join(""));
+    } else if (event.key === "Backspace" && !slots[index] && index > 0) {
+      event.preventDefault();
+      const next = [...slots];
+      next[index - 1] = "";
+      setSlots(next);
+      slotRefs.current[index - 1]?.focus({ preventScroll: true });
+    } else if (event.key === "ArrowLeft" && index > 0) {
+      event.preventDefault();
+      slotRefs.current[index - 1]?.focus({ preventScroll: true });
+    } else if (event.key === "ArrowRight" && index < CODE_LENGTH - 1) {
+      event.preventDefault();
+      slotRefs.current[index + 1]?.focus({ preventScroll: true });
+    }
+  }
+
+  function onCodeSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    submitCode(slots.join(""));
+  }
+
+  // Focus into the overlay (first slot) on open; back to the :) trigger on close.
+  const prevCodeOpen = useRef(false);
+  useEffect(() => {
+    if (codeOpen) {
+      slotRefs.current[0]?.focus({ preventScroll: true });
+    } else if (prevCodeOpen.current) {
+      codeTriggerRef.current?.focus({ preventScroll: true });
+    }
+    prevCodeOpen.current = codeOpen;
+  }, [codeOpen]);
+
+  // Escape closes the overlay.
+  useEffect(() => {
+    if (!codeOpen) return;
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeCode();
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [codeOpen, closeCode]);
+
+  useEffect(() => () => {
+    if (shakeTimer.current) clearTimeout(shakeTimer.current);
+  }, []);
+
   const isOpen = openId !== null;
+  // Any modal surface (a pillar/center panel or the code overlay) makes the
+  // orbit background inert and pauses rotation.
+  const anyOpen = isOpen || codeOpen;
 
   return (
     <>
-      <div className="orbit-page" data-panel-open={isOpen ? "true" : "false"}>
-        <section className="orbit-stage" aria-label="DDO pillar orbit" inert={isOpen || undefined}>
+      <div className="orbit-page" data-overlay-open={codeOpen ? "true" : undefined}>
+        <section className="orbit-stage" aria-label="DDO pillar orbit" inert={anyOpen || undefined}>
           <div className="orbit-shell">
             <span className="orbit-rim" aria-hidden="true" />
             <div className="orbit-track">
@@ -236,9 +347,26 @@ export function Orbit({ nodes, pillarIds, dock = "right" }: OrbitProps) {
             ) : null}
           </div>
         </section>
+
+        {/* Easter-egg entry — appears only once the wordmark locks to ODD. */}
+        {locked ? (
+          <button
+            type="button"
+            className="code-trigger"
+            ref={codeTriggerRef}
+            inert={anyOpen || undefined}
+            aria-haspopup="dialog"
+            aria-expanded={codeOpen}
+            aria-controls="code-overlay"
+            aria-label="Portfolio code"
+            onClick={openCode}
+          >
+            <span aria-hidden="true">:)</span>
+          </button>
+        ) : null}
       </div>
 
-      <footer className="orbit-footer" inert={isOpen || undefined}>
+      <footer className="orbit-footer" inert={anyOpen || undefined}>
         <p>&copy; {new Date().getFullYear()} DDO</p>
         <p>Design · Development · Optimization</p>
       </footer>
@@ -379,6 +507,58 @@ export function Orbit({ nodes, pillarIds, dock = "right" }: OrbitProps) {
           </div>
         </aside>
       ))}
+
+      {/* Portfolio-code overlay (enhanced path only — gated on the lock state). */}
+      {locked ? (
+        <div
+          className="code-overlay"
+          id="code-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="code-overlay-title"
+          data-open={codeOpen ? "true" : undefined}
+          hidden={!codeOpen}
+          ref={codeOverlayRef}
+          onKeyDown={(event) => trapTab(event, codeOverlayRef.current)}
+        >
+          <div className="code-overlay-scrim" aria-hidden="true" onClick={closeCode} />
+          <div className={`code-overlay-card${shaking ? " is-shaking" : ""}`}>
+            <button type="button" className="close-panel" onClick={closeCode}>
+              <span className="sr-only">Close portfolio code</span>
+            </button>
+            <h2 className="code-prompt" id="code-overlay-title">
+              time without e
+            </h2>
+            <form className="code-form" onSubmit={onCodeSubmit}>
+              <div className="code-slots">
+                {slots.map((value, index) => (
+                  <input
+                    key={index}
+                    ref={(el) => {
+                      slotRefs.current[index] = el;
+                    }}
+                    className="code-slot"
+                    type="text"
+                    inputMode="text"
+                    maxLength={1}
+                    value={value}
+                    aria-label={`Letter ${index + 1} of ${CODE_LENGTH}`}
+                    autoComplete="off"
+                    autoCorrect="off"
+                    autoCapitalize="none"
+                    spellCheck={false}
+                    onChange={(event) => onSlotChange(index, event.target.value)}
+                    onKeyDown={(event) => onSlotKeyDown(index, event)}
+                  />
+                ))}
+              </div>
+              <p className="code-feedback" role="status" aria-live="polite">
+                {codeFeedback}
+              </p>
+            </form>
+          </div>
+        </div>
+      ) : null}
     </>
   );
 }

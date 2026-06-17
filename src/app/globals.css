@@ -177,13 +177,16 @@ body::after {
   pointer-events: none;
 }
 
-/* pause rotation when a node is hovered/focused, or while a panel is open */
-.orbit-shell:hover .orbit-track,
+/* Pause rotation while a pillar is hovered (scoped to the node, so it resumes
+   the instant the cursor leaves a pillar), while any node is focused (keyboard
+   a11y), or while the full-screen easter-egg overlay is open. A pillar side
+   panel does NOT pause it — the orbit keeps rotating behind the panel. */
+.orbit-track:has(.pillar:hover),
+.orbit-track:has(.pillar:hover) .pillar-label,
 .orbit-shell:focus-within .orbit-track,
-.orbit-shell:hover .pillar-label,
 .orbit-shell:focus-within .pillar-label,
-.orbit-page[data-panel-open="true"] .orbit-track,
-.orbit-page[data-panel-open="true"] .pillar-label {
+.orbit-page[data-overlay-open="true"] .orbit-track,
+.orbit-page[data-overlay-open="true"] .pillar-label {
   animation-play-state: paused;
 }
 
@@ -701,6 +704,132 @@ body::after {
   border: 0;
 }
 
+/* ---- portfolio-code easter egg ---- */
+
+.code-trigger {
+  position: absolute;
+  bottom: clamp(16px, 4vw, 34px);
+  left: 50%;
+  transform: translateX(-50%);
+  min-height: 40px;
+  padding: 6px 18px;
+  border: 1px solid rgb(var(--color-ink) / 0.22);
+  border-radius: 999px;
+  background: rgb(var(--color-surface) / 0.5);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  color: rgb(var(--color-ink) / 0.78);
+  font-family: var(--font-display);
+  font-size: 18px;
+  line-height: 1;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: border-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
+}
+
+.code-trigger:hover,
+.code-trigger:focus-visible {
+  outline: 0;
+  border-color: rgb(var(--color-brass));
+  color: rgb(var(--color-ink));
+  transform: translateX(-50%) translateY(-2px);
+}
+
+.code-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: clamp(22px, 5vw, 56px);
+}
+
+/* author display:grid would otherwise beat the UA [hidden] rule — keep the
+   closed overlay collapsed so it only renders when codeOpen, not on lock. */
+.code-overlay[hidden] {
+  display: none;
+}
+
+.code-overlay-scrim {
+  position: absolute;
+  inset: 0;
+  background: rgb(var(--color-scrim) / 0.55);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+
+.code-overlay-card {
+  position: relative;
+  z-index: 1;
+  width: min(440px, 92vw);
+  display: grid;
+  gap: 24px;
+  padding: clamp(30px, 5vw, 48px);
+  border: 1px solid rgb(var(--color-line) / 0.2);
+  border-radius: 16px;
+  background: rgb(var(--color-panel) / 0.82);
+  -webkit-backdrop-filter: blur(34px);
+  backdrop-filter: blur(34px);
+  box-shadow: 0 32px 90px rgb(var(--color-shadow) / 0.36);
+  text-align: center;
+}
+
+.code-overlay-card.is-shaking {
+  animation: codeShake 0.4s ease;
+}
+
+.code-prompt {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(26px, 5vw, 34px);
+  font-weight: 400;
+  line-height: 1.05;
+  letter-spacing: 0;
+  color: rgb(var(--color-ink));
+  text-transform: lowercase;
+}
+
+.code-form {
+  display: grid;
+  gap: 16px;
+}
+
+.code-slots {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+
+.code-slot {
+  width: clamp(48px, 14vw, 64px);
+  height: clamp(56px, 16vw, 72px);
+  padding: 0;
+  text-align: center;
+  font-family: var(--font-display);
+  font-size: clamp(28px, 7vw, 38px);
+  text-transform: lowercase;
+  color: rgb(var(--color-ink));
+  background: rgb(var(--color-ink) / 0.05);
+  border: 1px solid rgb(var(--color-ink) / 0.28);
+  border-radius: 12px;
+  caret-color: rgb(var(--color-brass));
+  transition: border-color 0.18s ease, background 0.18s ease;
+}
+
+.code-slot:focus {
+  outline: 0;
+  border-color: rgb(var(--color-brass));
+  background: rgb(var(--color-ink) / 0.1);
+}
+
+.code-feedback {
+  margin: 0;
+  min-height: 1.2em;
+  color: rgb(var(--color-ink) / 0.72);
+  font-size: 14px;
+  letter-spacing: 0.04em;
+}
+
 /* ---- animations ---- */
 
 @keyframes orbitCounterClockwise {
@@ -712,6 +841,25 @@ body::after {
 @keyframes labelCounterBalance {
   to {
     transform: rotate(360deg);
+  }
+}
+
+@keyframes codeShake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-8px);
+  }
+  40% {
+    transform: translateX(8px);
+  }
+  60% {
+    transform: translateX(-5px);
+  }
+  80% {
+    transform: translateX(5px);
   }
 }
 
@@ -728,8 +876,14 @@ body::after {
   .pillar,
   .core-letter,
   .info-panel,
-  .panel-scrim {
+  .panel-scrim,
+  .code-slot,
+  .code-trigger {
     transition-duration: 0.01ms;
+  }
+
+  .code-overlay-card.is-shaking {
+    animation: none;
   }
 }
 

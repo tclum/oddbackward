@@ -3,11 +3,12 @@ import path from "node:path";
 import React from "react";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import Home from "@/app/page";
 import { metadata } from "@/app/layout";
 import { siteConfig } from "@/config/site";
 import { orbitNodes, pillarIds } from "@/data/orbit";
+import { portfolios, resolvePortfolio } from "@/data/portfolio";
 import { pillars, selectedWork } from "@/data/work";
 
 function renderHome() {
@@ -16,6 +17,16 @@ function renderHome() {
 
 function coreMarkText(): string {
   return (document.querySelector(".core-mark")?.textContent ?? "").trim();
+}
+
+// Open and close all three distinct pillars — the path that locks DDO→ODD and
+// reveals the :) easter-egg trigger.
+async function lockOrbit(user: ReturnType<typeof userEvent.setup>): Promise<void> {
+  for (const pillar of pillars) {
+    await user.click(screen.getByRole("button", { name: pillar.pillar }));
+    await user.click(screen.getByRole("button", { name: /close/i }));
+  }
+  await waitFor(() => expect(coreMarkText()).toBe("ODD"));
 }
 
 function isPermutationOfDDO(value: string): boolean {
@@ -110,6 +121,78 @@ describe("DDO Hawaii Orbit", () => {
     await waitFor(() => expect(coreMarkText()).toBe("ODD"));
     expect(isPermutationOfDDO(coreMarkText())).toBe(true);
     expect(document.querySelector(".orbit-core.is-locked")).not.toBeNull();
+  });
+
+  it("hides the :) trigger until the ODD lock, then reveals it", async () => {
+    const user = userEvent.setup();
+    renderHome();
+
+    expect(screen.queryByRole("button", { name: "Portfolio code" })).not.toBeInTheDocument();
+    await lockOrbit(user);
+    expect(screen.getByRole("button", { name: "Portfolio code" })).toBeInTheDocument();
+  });
+
+  it("opens the portfolio-code overlay with three letter slots", async () => {
+    const user = userEvent.setup();
+    renderHome();
+    await lockOrbit(user);
+
+    await user.click(screen.getByRole("button", { name: "Portfolio code" }));
+    const dialog = screen.getByRole("dialog", { name: "time without e" });
+    expect(dialog).toBeInTheDocument();
+    expect(within(dialog).getAllByRole("textbox")).toHaveLength(3);
+  });
+
+  it("resolves a correct code to the registry portfolioUrl", async () => {
+    const user = userEvent.setup();
+    const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+    renderHome();
+    await lockOrbit(user);
+
+    await user.click(screen.getByRole("button", { name: "Portfolio code" }));
+    await user.keyboard("tim");
+
+    expect(openSpy).toHaveBeenCalledWith(
+      portfolios[0].portfolioUrl,
+      "_blank",
+      "noopener,noreferrer",
+    );
+    openSpy.mockRestore();
+  });
+
+  it("gives dry retry feedback for a wrong code and does not navigate", async () => {
+    const user = userEvent.setup();
+    const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+    renderHome();
+    await lockOrbit(user);
+
+    await user.click(screen.getByRole("button", { name: "Portfolio code" }));
+    await user.keyboard("zzz");
+
+    expect(await screen.findByText("not quite")).toBeInTheDocument();
+    expect(openSpy).not.toHaveBeenCalled();
+
+    const dialog = screen.getByRole("dialog", { name: "time without e" });
+    for (const slot of within(dialog).getAllByRole("textbox")) {
+      expect(slot).toHaveValue("");
+    }
+    openSpy.mockRestore();
+  });
+
+  it("looks up codes generically over the registry (a second entry resolves too)", () => {
+    // real registry
+    expect(resolvePortfolio("tim")).toEqual(portfolios[0]);
+    expect(resolvePortfolio("  TIM  ")).toEqual(portfolios[0]); // normalized
+    expect(resolvePortfolio("zzz")).toBeNull();
+
+    // a fake multi-entry registry — proves the lookup isn't hardcoded to "tim"
+    const fake = [
+      { code: "abc", name: "Ada B.", portfolioUrl: "https://ada.example" },
+      { code: "xyz", name: "Xan Y.", portfolioUrl: "https://xan.example" },
+    ];
+    expect(resolvePortfolio("abc", fake)?.portfolioUrl).toBe("https://ada.example");
+    expect(resolvePortfolio("XYZ ", fake)?.portfolioUrl).toBe("https://xan.example");
+    expect(resolvePortfolio("tim", fake)).toBeNull();
   });
 
   it("uses configured destinations for every external and contact link", () => {
