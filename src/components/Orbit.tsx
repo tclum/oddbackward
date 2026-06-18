@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import type { OrbitNode } from "@/data/orbit";
 import { resolvePortfolio } from "@/data/portfolio";
@@ -12,12 +12,44 @@ type OrbitProps = {
   dock?: "right" | "left";
 };
 
-type LetterOrder = "DDO" | "DOD" | "ODD";
-
-const INTERMEDIATE_ORDERS: LetterOrder[] = ["DDO", "DOD"];
-
 // Three letter-slots, echoing the three-glyph wordmark / 3-letter portfolio codes.
 const CODE_LENGTH = 3;
+
+// How long the finale words hold before the FSM resets to the odd start state.
+const FINALE_MS = 2000;
+
+// ---- center reveal FSM (v2) ----
+// Direction is ODD -> DDO (the inverse of v1). odd is the deterministic start
+// state (also what SSR renders). Opening distinct pillars walks odd -> exploring
+// -> ddo; clicking the center in ddo plays the finale, which resets to odd.
+type Phase = "odd" | "exploring" | "ddo" | "finale";
+
+type RevealState = { phase: Phase; opened: Set<string> };
+
+type RevealAction =
+  | { type: "OPEN_PILLAR"; id: string }
+  | { type: "CENTER_CLICK" }
+  | { type: "RESET" };
+
+function makeRevealReducer(pillarCount: number) {
+  return function revealReducer(state: RevealState, action: RevealAction): RevealState {
+    switch (action.type) {
+      case "OPEN_PILLAR": {
+        if (state.phase === "finale") return state;
+        const opened = new Set(state.opened);
+        opened.add(action.id);
+        const phase: Phase = opened.size >= pillarCount ? "ddo" : "exploring";
+        return { phase, opened };
+      }
+      case "CENTER_CLICK":
+        return state.phase === "ddo" ? { phase: "finale", opened: state.opened } : state;
+      case "RESET":
+        return { phase: "odd", opened: new Set() };
+      default:
+        return state;
+    }
+  };
+}
 
 function prefersReducedMotion(): boolean {
   return (
@@ -39,16 +71,22 @@ export function Orbit({ nodes, pillarIds, dock = "right" }: OrbitProps) {
   const pillars = nodes.filter((node) => node.kind === "pillar");
   const center = nodes.find((node) => node.kind === "center");
   const pillarCount = pillarIds.length;
+  const pillarWords = pillars.map((node) => node.nodeLabel);
 
   const [mounted, setMounted] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
-  const [pressed, setPressed] = useState<Set<string>>(new Set());
-  const [order, setOrder] = useState<LetterOrder>("DDO");
-  const [locked, setLocked] = useState(false);
-  const [shuffling, setShuffling] = useState(false);
 
-  // Portfolio-code easter egg — gated entirely on the `locked` latch (the ODD
-  // reveal). No parallel "all opened" tracker.
+  // Center reveal FSM.
+  const revealReducer = useMemo(() => makeRevealReducer(pillarCount), [pillarCount]);
+  const [reveal, dispatch] = useReducer(revealReducer, undefined, () => ({
+    phase: "odd" as Phase,
+    opened: new Set<string>(),
+  }));
+  const { phase } = reveal;
+  const sparkle = reveal.opened.size >= 1; // 1st distinct pillar
+  const glow = reveal.opened.size >= 2; // 2nd distinct pillar (keeps sparkle)
+
+  // Portfolio-code easter egg — gated on the `ddo` phase (replaces the old lock).
   const [codeOpen, setCodeOpen] = useState(false);
   const [slots, setSlots] = useState<string[]>(() => Array(CODE_LENGTH).fill(""));
   const [codeFeedback, setCodeFeedback] = useState("");
@@ -58,68 +96,38 @@ export function Orbit({ nodes, pillarIds, dock = "right" }: OrbitProps) {
   const closeRefs = useRef(new Map<string, HTMLButtonElement | null>());
   const panelRefs = useRef(new Map<string, HTMLElement | null>());
   const lastTriggerId = useRef<string | null>(null);
-  const shuffleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const codeTriggerRef = useRef<HTMLButtonElement | null>(null);
   const codeOverlayRef = useRef<HTMLDivElement | null>(null);
   const slotRefs = useRef<(HTMLInputElement | null)[]>([]);
   const shakeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => setMounted(true), []);
-  useEffect(() => () => {
-    if (shuffleTimer.current) clearTimeout(shuffleTimer.current);
-  }, []);
 
-  const applyOrder = useCallback((next: LetterOrder) => {
-    if (prefersReducedMotion()) {
-      setOrder(next);
-      return;
-    }
-    setShuffling(true);
-    if (shuffleTimer.current) clearTimeout(shuffleTimer.current);
-    shuffleTimer.current = setTimeout(() => {
-      setOrder(next);
-      setShuffling(false);
-    }, 150);
-  }, []);
-
-  // Reveal is keyed to DISTINCT pillars: shuffle DDO/DOD on each new pillar, then
-  // lock to ODD the moment all distinct pillars have been opened. ODD is reserved
-  // for the lock so the reveal isn't spoiled early. The random intermediate runs
-  // only after hydration; SSR/initial render is always the deterministic "DDO".
-  const advanceReveal = useCallback(
-    (nextPressedCount: number, currentOrder: LetterOrder) => {
-      if (locked) return;
-      if (nextPressedCount >= pillarCount) {
-        setLocked(true);
-        applyOrder("ODD");
-        return;
-      }
-      const candidates = INTERMEDIATE_ORDERS.filter((o) => o !== currentOrder);
-      const next = candidates[Math.floor(Math.random() * candidates.length)] ?? "DOD";
-      applyOrder(next);
+  // Drive the black-background theme off the phase (client-only; SSR stays teal).
+  useEffect(() => {
+    document.documentElement.dataset.phase = phase;
+  }, [phase]);
+  useEffect(
+    () => () => {
+      delete document.documentElement.dataset.phase;
     },
-    [applyOrder, locked, pillarCount],
+    [],
   );
 
-  const openNode = useCallback(
-    (node: OrbitNode) => {
-      document.documentElement.style.setProperty("--active-accent", node.accent);
-      lastTriggerId.current = node.id;
-      if (node.kind === "pillar") {
-        // Shuffle on every pillar open; the lock is keyed to DISTINCT pillars.
-        const alreadyOpened = pressed.has(node.id);
-        const distinctCount = alreadyOpened ? pressed.size : pressed.size + 1;
-        if (!alreadyOpened) {
-          const next = new Set(pressed);
-          next.add(node.id);
-          setPressed(next);
-        }
-        advanceReveal(distinctCount, order);
-      }
-      setOpenId(node.id);
-    },
-    [advanceReveal, order, pressed],
-  );
+  // Finale holds the three words, then resets to the odd start state.
+  useEffect(() => {
+    if (phase !== "finale") return;
+    const timer = setTimeout(() => dispatch({ type: "RESET" }), FINALE_MS);
+    return () => clearTimeout(timer);
+  }, [phase]);
+
+  // Open a pillar: advance the reveal AND open its panel (panel behavior unchanged).
+  const openPillar = useCallback((node: OrbitNode) => {
+    document.documentElement.style.setProperty("--active-accent", node.accent);
+    lastTriggerId.current = node.id;
+    dispatch({ type: "OPEN_PILLAR", id: node.id });
+    setOpenId(node.id);
+  }, []);
 
   const closePanel = useCallback(() => {
     setOpenId(null);
@@ -264,9 +272,49 @@ export function Orbit({ nodes, pillarIds, dock = "right" }: OrbitProps) {
   }, []);
 
   const isOpen = openId !== null;
-  // Any modal surface (a pillar/center panel or the code overlay) makes the
-  // orbit background inert and pauses rotation.
+  // A pillar panel or the code overlay makes the orbit background inert; only the
+  // overlay pauses rotation (data-overlay-open).
   const anyOpen = isOpen || codeOpen;
+  const showCode = phase === "ddo";
+
+  const centerLetters = phase === "ddo" ? "DDO" : "ODD"; // odd / exploring → ODD
+  const centerAnnounce =
+    phase === "finale" ? `${pillarWords.join(". ")}.` : phase === "ddo" ? "DDO" : "ODD";
+  const coreClassName = ["orbit-core", sparkle ? "is-sparkle" : "", glow ? "is-glow" : ""]
+    .filter(Boolean)
+    .join(" ");
+  const coreContent = (
+    <>
+      <span className="sr-only" aria-live="polite">
+        {centerAnnounce}
+      </span>
+      <span className="core-sparkles" aria-hidden="true">
+        {Array.from({ length: 5 }, (_, i) => (
+          <span className="core-spark" key={i} />
+        ))}
+      </span>
+      <span className="core-label" aria-hidden="true">
+        Center
+      </span>
+      {phase === "finale" ? (
+        <span className="core-words" aria-hidden="true">
+          {pillarWords.map((word) => (
+            <span className="core-word" key={word}>
+              {word}
+            </span>
+          ))}
+        </span>
+      ) : (
+        <strong className="core-mark" aria-hidden="true">
+          {centerLetters.split("").map((letter, i) => (
+            <span className="core-letter" key={i}>
+              {letter}
+            </span>
+          ))}
+        </strong>
+      )}
+    </>
+  );
 
   return (
     <>
@@ -289,7 +337,7 @@ export function Orbit({ nodes, pillarIds, dock = "right" }: OrbitProps) {
                     className={[
                       "pillar",
                       openId === node.id ? "is-active" : "",
-                      pressed.has(node.id) ? "has-been-pressed" : "",
+                      reveal.opened.has(node.id) ? "has-been-pressed" : "",
                     ]
                       .filter(Boolean)
                       .join(" ")}
@@ -302,7 +350,7 @@ export function Orbit({ nodes, pillarIds, dock = "right" }: OrbitProps) {
                     ref={(el) => {
                       triggerRefs.current.set(node.id, el);
                     }}
-                    onClick={() => openNode(node)}
+                    onClick={() => openPillar(node)}
                   >
                     <span className="pillar-label">
                       <small>{node.number}</small>
@@ -314,42 +362,24 @@ export function Orbit({ nodes, pillarIds, dock = "right" }: OrbitProps) {
             </div>
 
             {center ? (
-              <button
-                type="button"
-                className={`orbit-core${locked ? " is-locked" : ""}`}
-                aria-haspopup="dialog"
-                aria-expanded={openId === center.id}
-                aria-controls={`panel-${center.id}`}
-                ref={(el) => {
-                  triggerRefs.current.set(center.id, el);
-                }}
-                onClick={() => openNode(center)}
-              >
-                <span className="sr-only" aria-live="polite">
-                  {locked ? `${order}. DDO, backwards.` : order}
-                </span>
-                <span className="core-label" aria-hidden="true">
-                  Center
-                </span>
-                <strong className={`core-mark${shuffling ? " is-shuffling" : ""}`} aria-hidden="true">
-                  {order.split("").map((letter, i) => (
-                    <span className="core-letter" key={i}>
-                      {letter}
-                    </span>
-                  ))}
-                </strong>
-                {locked ? (
-                  <span className="core-caption" aria-hidden="true">
-                    DDO, backwards.
-                  </span>
-                ) : null}
-              </button>
+              phase === "ddo" ? (
+                <button
+                  type="button"
+                  className={coreClassName}
+                  aria-label="Reveal Design, Development, Optimization"
+                  onClick={() => dispatch({ type: "CENTER_CLICK" })}
+                >
+                  {coreContent}
+                </button>
+              ) : (
+                <div className={coreClassName}>{coreContent}</div>
+              )
             ) : null}
           </div>
         </section>
 
-        {/* Easter-egg entry — appears only once the wordmark locks to ODD. */}
-        {locked ? (
+        {/* Easter-egg entry — visible only in the ddo phase; clears on reset. */}
+        {showCode ? (
           <button
             type="button"
             className="code-trigger"
@@ -508,8 +538,8 @@ export function Orbit({ nodes, pillarIds, dock = "right" }: OrbitProps) {
         </aside>
       ))}
 
-      {/* Portfolio-code overlay (enhanced path only — gated on the lock state). */}
-      {locked ? (
+      {/* Portfolio-code overlay (enhanced path only — gated on the ddo phase). */}
+      {showCode ? (
         <div
           className="code-overlay"
           id="code-overlay"
