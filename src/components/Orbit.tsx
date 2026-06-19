@@ -8,8 +8,6 @@ import { resolvePortfolio } from "@/data/portfolio";
 type OrbitProps = {
   nodes: OrbitNode[];
   pillarIds: string[];
-  /** desktop dock edge for the panels; mobile always docks to the bottom. */
-  dock?: "right" | "left";
 };
 
 // Three letter-slots, echoing the three-glyph wordmark / 3-letter portfolio codes.
@@ -19,9 +17,9 @@ const CODE_LENGTH = 3;
 const FINALE_MS = 2000;
 
 // ---- center reveal FSM (v2) ----
-// Direction is ODD -> DDO (the inverse of v1). odd is the deterministic start
-// state (also what SSR renders). Opening distinct pillars walks odd -> exploring
-// -> ddo; clicking the center in ddo plays the finale, which resets to odd.
+// Direction is ODD -> DDO. odd is the deterministic start state (also what SSR
+// renders). Opening distinct pillars walks odd -> exploring -> ddo; clicking the
+// center in ddo plays the finale, which resets to odd.
 type Phase = "odd" | "exploring" | "ddo" | "finale";
 
 type RevealState = { phase: Phase; opened: Set<string> };
@@ -51,6 +49,32 @@ function makeRevealReducer(pillarCount: number) {
   };
 }
 
+// ---- pillar dock (non-modal disclosure) ----
+// An ordered list (one entry per opened pillar, max = pillar count) with exactly
+// one entry expanded at a time. Replaces the single modal openId.
+type DockEntry = { id: string; state: "expanded" | "minimized" };
+
+type DockAction =
+  | { type: "EXPAND"; id: string }
+  | { type: "MINIMIZE" }
+  | { type: "RESET" };
+
+function dockReducer(docked: DockEntry[], action: DockAction): DockEntry[] {
+  switch (action.type) {
+    case "EXPAND": {
+      const exists = docked.some((d) => d.id === action.id);
+      const base = exists ? docked : [...docked, { id: action.id, state: "minimized" as const }];
+      return base.map((d) => ({ ...d, state: d.id === action.id ? "expanded" : "minimized" }));
+    }
+    case "MINIMIZE":
+      return docked.map((d) => ({ ...d, state: "minimized" as const }));
+    case "RESET":
+      return [];
+    default:
+      return docked;
+  }
+}
+
 function prefersReducedMotion(): boolean {
   return (
     typeof window !== "undefined" &&
@@ -67,14 +91,13 @@ function focusableWithin(root: HTMLElement): HTMLElement[] {
   ).filter((el) => el.offsetParent !== null || el === document.activeElement);
 }
 
-export function Orbit({ nodes, pillarIds, dock = "right" }: OrbitProps) {
+export function Orbit({ nodes, pillarIds }: OrbitProps) {
   const pillars = nodes.filter((node) => node.kind === "pillar");
   const center = nodes.find((node) => node.kind === "center");
   const pillarCount = pillarIds.length;
   const pillarWords = pillars.map((node) => node.nodeLabel);
 
   const [mounted, setMounted] = useState(false);
-  const [openId, setOpenId] = useState<string | null>(null);
 
   // Center reveal FSM.
   const revealReducer = useMemo(() => makeRevealReducer(pillarCount), [pillarCount]);
@@ -86,16 +109,18 @@ export function Orbit({ nodes, pillarIds, dock = "right" }: OrbitProps) {
   const sparkle = reveal.opened.size >= 1; // 1st distinct pillar
   const glow = reveal.opened.size >= 2; // 2nd distinct pillar (keeps sparkle)
 
-  // Portfolio-code easter egg — gated on the `ddo` phase (replaces the old lock).
+  // Pillar dock.
+  const [docked, dockDispatch] = useReducer(dockReducer, []);
+  const expandedId = docked.find((d) => d.state === "expanded")?.id ?? null;
+
+  // Portfolio-code easter egg — gated on the `ddo` phase.
   const [codeOpen, setCodeOpen] = useState(false);
   const [slots, setSlots] = useState<string[]>(() => Array(CODE_LENGTH).fill(""));
   const [codeFeedback, setCodeFeedback] = useState("");
   const [shaking, setShaking] = useState(false);
 
-  const triggerRefs = useRef(new Map<string, HTMLButtonElement | null>());
-  const closeRefs = useRef(new Map<string, HTMLButtonElement | null>());
   const panelRefs = useRef(new Map<string, HTMLElement | null>());
-  const lastTriggerId = useRef<string | null>(null);
+  const tabRefs = useRef(new Map<string, HTMLButtonElement | null>());
   const codeTriggerRef = useRef<HTMLButtonElement | null>(null);
   const codeOverlayRef = useRef<HTMLDivElement | null>(null);
   const slotRefs = useRef<(HTMLInputElement | null)[]>([]);
@@ -121,44 +146,65 @@ export function Orbit({ nodes, pillarIds, dock = "right" }: OrbitProps) {
     return () => clearTimeout(timer);
   }, [phase]);
 
-  // Open a pillar: advance the reveal AND open its panel (panel behavior unchanged).
+  // The odd start state has no dock — clear it whenever the FSM returns to odd.
+  useEffect(() => {
+    if (phase === "odd") dockDispatch({ type: "RESET" });
+  }, [phase]);
+
+  // Open a pillar: advance the reveal AND dock it expanded (others minimize).
   const openPillar = useCallback((node: OrbitNode) => {
     document.documentElement.style.setProperty("--active-accent", node.accent);
-    lastTriggerId.current = node.id;
     dispatch({ type: "OPEN_PILLAR", id: node.id });
-    setOpenId(node.id);
+    dockDispatch({ type: "EXPAND", id: node.id });
   }, []);
 
-  const closePanel = useCallback(() => {
-    setOpenId(null);
-  }, []);
+  const minimize = useCallback(() => dockDispatch({ type: "MINIMIZE" }), []);
 
-  // Manage focus across open/close. On open, focus moves to the panel's close
-  // button; on close, it returns to the triggering node (after the re-render has
-  // cleared `inert` from the orbit, so the node is focusable again).
-  const prevOpenId = useRef<string | null>(null);
+  // Move focus to the expanded panel on expand; back to its tab on minimize.
+  const prevExpandedId = useRef<string | null>(null);
   useEffect(() => {
-    if (openId) {
-      closeRefs.current.get(openId)?.focus({ preventScroll: true });
-    } else if (prevOpenId.current) {
-      const id = lastTriggerId.current;
-      if (id) triggerRefs.current.get(id)?.focus({ preventScroll: true });
+    if (!mounted) return;
+    if (expandedId) {
+      panelRefs.current.get(expandedId)?.focus({ preventScroll: true });
+    } else if (prevExpandedId.current) {
+      tabRefs.current.get(prevExpandedId.current)?.focus({ preventScroll: true });
     }
-    prevOpenId.current = openId;
-  }, [openId]);
+    prevExpandedId.current = expandedId;
+  }, [expandedId, mounted]);
 
-  // Escape closes the open panel.
+  // Escape minimizes the expanded panel (non-modal — the orbit stays live).
   useEffect(() => {
-    if (!openId) return;
+    if (!expandedId) return;
     function onKey(event: KeyboardEvent) {
       if (event.key === "Escape") {
         event.preventDefault();
-        closePanel();
+        minimize();
       }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [openId, closePanel]);
+  }, [expandedId, minimize]);
+
+  // Clicking empty space / the orbit (not a pillar, tab, panel, or the easter egg)
+  // minimizes the expanded panel.
+  useEffect(() => {
+    if (!expandedId) return;
+    function onClick(event: MouseEvent) {
+      const target = event.target as HTMLElement | null;
+      if (
+        target?.closest(".info-panel") ||
+        target?.closest(".dock-strip") ||
+        target?.closest(".pillar") ||
+        target?.closest(".code-trigger") ||
+        target?.closest(".code-overlay")
+      ) {
+        return;
+      }
+      minimize();
+    }
+    document.addEventListener("click", onClick);
+    return () => document.removeEventListener("click", onClick);
+  }, [expandedId, minimize]);
 
   function trapTab(event: React.KeyboardEvent<HTMLElement>, root: HTMLElement | null) {
     if (event.key !== "Tab" || !root) return;
@@ -176,11 +222,7 @@ export function Orbit({ nodes, pillarIds, dock = "right" }: OrbitProps) {
     }
   }
 
-  function onPanelKeyDown(event: React.KeyboardEvent<HTMLElement>) {
-    trapTab(event, panelRefs.current.get(openId ?? "") ?? null);
-  }
-
-  // ---- portfolio-code overlay ----
+  // ---- portfolio-code overlay (modal — unchanged) ----
 
   const openCode = useCallback(() => {
     setCodeFeedback("");
@@ -243,7 +285,6 @@ export function Orbit({ nodes, pillarIds, dock = "right" }: OrbitProps) {
     submitCode(slots.join(""));
   }
 
-  // Focus into the overlay (first slot) on open; back to the :) trigger on close.
   const prevCodeOpen = useRef(false);
   useEffect(() => {
     if (codeOpen) {
@@ -254,7 +295,6 @@ export function Orbit({ nodes, pillarIds, dock = "right" }: OrbitProps) {
     prevCodeOpen.current = codeOpen;
   }, [codeOpen]);
 
-  // Escape closes the overlay.
   useEffect(() => {
     if (!codeOpen) return;
     function onKey(event: KeyboardEvent) {
@@ -271,10 +311,7 @@ export function Orbit({ nodes, pillarIds, dock = "right" }: OrbitProps) {
     if (shakeTimer.current) clearTimeout(shakeTimer.current);
   }, []);
 
-  const isOpen = openId !== null;
-  // A pillar panel or the code overlay makes the orbit background inert; only the
-  // overlay pauses rotation (data-overlay-open).
-  const anyOpen = isOpen || codeOpen;
+  // Only the code overlay is modal: it inerts the orbit and pauses rotation.
   const showCode = phase === "ddo";
 
   const centerLetters = phase === "ddo" ? "DDO" : "ODD"; // odd / exploring → ODD
@@ -319,11 +356,16 @@ export function Orbit({ nodes, pillarIds, dock = "right" }: OrbitProps) {
   return (
     <>
       <div className="orbit-page" data-overlay-open={codeOpen ? "true" : undefined}>
-        <section className="orbit-stage" aria-label="DDO pillar orbit" inert={anyOpen || undefined}>
+        <section className="orbit-stage" aria-label="DDO pillar orbit" inert={codeOpen || undefined}>
           <div className="orbit-shell">
             <span className="orbit-rim" aria-hidden="true" />
             <div className="orbit-track">
               {pillars.map((node, index) => {
+                // A docked pillar has left the orbit (it lives in the dock now).
+                // Keep the remaining pillars at their ORIGINAL angles — the angle
+                // derives from the full-list index, so a gap is left where a
+                // pillar departed rather than re-spacing the others.
+                if (docked.some((d) => d.id === node.id)) return null;
                 const angle = index * (360 / pillars.length);
                 const style = {
                   "--angle": `${angle}deg`,
@@ -334,22 +376,12 @@ export function Orbit({ nodes, pillarIds, dock = "right" }: OrbitProps) {
                   <button
                     key={node.id}
                     type="button"
-                    className={[
-                      "pillar",
-                      openId === node.id ? "is-active" : "",
-                      reveal.opened.has(node.id) ? "has-been-pressed" : "",
-                    ]
-                      .filter(Boolean)
-                      .join(" ")}
+                    className="pillar"
                     data-pillar={node.id}
                     style={style}
                     aria-label={node.nodeLabel}
-                    aria-haspopup="dialog"
-                    aria-expanded={openId === node.id}
+                    aria-expanded={expandedId === node.id}
                     aria-controls={`panel-${node.id}`}
-                    ref={(el) => {
-                      triggerRefs.current.set(node.id, el);
-                    }}
                     onClick={() => openPillar(node)}
                   >
                     <span className="pillar-label">
@@ -384,7 +416,7 @@ export function Orbit({ nodes, pillarIds, dock = "right" }: OrbitProps) {
             type="button"
             className="code-trigger"
             ref={codeTriggerRef}
-            inert={anyOpen || undefined}
+            inert={codeOpen || undefined}
             aria-haspopup="dialog"
             aria-expanded={codeOpen}
             aria-controls="code-overlay"
@@ -396,147 +428,170 @@ export function Orbit({ nodes, pillarIds, dock = "right" }: OrbitProps) {
         ) : null}
       </div>
 
-      <footer className="orbit-footer" inert={anyOpen || undefined}>
+      <footer className="orbit-footer" inert={codeOpen || undefined}>
         <p>&copy; {new Date().getFullYear()} DDO</p>
         <p>Design · Development · Optimization</p>
       </footer>
 
-      <div
-        className="panel-scrim"
-        data-open={isOpen ? "true" : undefined}
-        aria-hidden="true"
-        onClick={closePanel}
-      />
+      {/* Bottom dock strip — client-only; one tab per opened pillar. */}
+      {mounted && docked.length > 0 ? (
+        <div className="dock-strip" role="group" aria-label="Open pillars">
+          {docked.map((entry) => {
+            const node = pillars.find((p) => p.id === entry.id);
+            if (!node) return null;
+            return (
+              <button
+                key={entry.id}
+                type="button"
+                className="dock-tab"
+                data-state={entry.state}
+                aria-expanded={entry.state === "expanded"}
+                aria-controls={`panel-${entry.id}`}
+                ref={(el) => {
+                  tabRefs.current.set(entry.id, el);
+                }}
+                onClick={() =>
+                  dockDispatch(
+                    entry.state === "expanded" ? { type: "MINIMIZE" } : { type: "EXPAND", id: entry.id },
+                  )
+                }
+              >
+                {node.nodeLabel}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
 
-      {nodes.map((node) => (
-        <aside
-          key={node.id}
-          id={`panel-${node.id}`}
-          className="info-panel"
-          data-dock={dock}
-          data-open={openId === node.id ? "true" : undefined}
-          hidden={mounted && openId !== node.id}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby={`${node.id}-title`}
-          ref={(el) => {
-            panelRefs.current.set(node.id, el);
-          }}
-          onKeyDown={onPanelKeyDown}
-        >
-          <div className="panel-inner">
-            <button
-              type="button"
-              className="close-panel"
-              ref={(el) => {
-                closeRefs.current.set(node.id, el);
-              }}
-              onClick={closePanel}
-            >
-              <span className="sr-only">Close {node.nodeLabel}</span>
-            </button>
+      {/*
+        Pillar/center content panels. Base (no-JS) = static stacked readable blocks
+        (the fallback + SSR parity). Under `.js` they're hidden unless docked
+        expanded, when they render as a non-modal labelled region above the dock
+        strip. The center panel is never docked (display-only); its content lives
+        on as the no-JS fallback block.
+      */}
+      {nodes.map((node) => {
+        const entry = docked.find((d) => d.id === node.id);
+        return (
+          <aside
+            key={node.id}
+            id={`panel-${node.id}`}
+            className="info-panel"
+            data-state={entry?.state}
+            role="region"
+            aria-labelledby={`${node.id}-title`}
+            tabIndex={-1}
+            ref={(el) => {
+              panelRefs.current.set(node.id, el);
+            }}
+          >
+            <div className="panel-inner">
+              <button type="button" className="close-panel" onClick={minimize}>
+                <span className="sr-only">Minimize {node.nodeLabel}</span>
+              </button>
 
-            <p className="panel-kicker">{node.kicker}</p>
-            <h2 className="panel-title" id={`${node.id}-title`}>
-              {node.title}
-            </h2>
-            <p className="panel-copy">{node.copy}</p>
-            <div className="panel-rule" aria-hidden="true" />
+              <p className="panel-kicker">{node.kicker}</p>
+              <h2 className="panel-title" id={`${node.id}-title`}>
+                {node.title}
+              </h2>
+              <p className="panel-copy">{node.copy}</p>
+              <div className="panel-rule" aria-hidden="true" />
 
-            {node.links.length > 0 ? (
-              <div className="panel-actions">
-                {node.links.map((link) => (
-                  <a
-                    key={link.href}
-                    className="panel-link"
-                    data-variant={link.variant}
-                    href={link.href}
-                    aria-label={link.ariaLabel}
-                    {...(link.external ? { target: "_blank", rel: "noreferrer" } : {})}
-                  >
-                    {link.label}
-                  </a>
-                ))}
-              </div>
-            ) : null}
-
-            {node.image ? (
-              <img className="panel-image" src={node.image.src} alt={node.image.alt} />
-            ) : null}
-
-            {node.pairs.length > 0 ? (
-              <div className="panel-pair">
-                {node.pairs.map((pair) => (
-                  <div key={pair.heading}>
-                    <h4>{pair.heading}</h4>
-                    <p>{pair.body}</p>
-                  </div>
-                ))}
-              </div>
-            ) : null}
-
-            {node.proofs.length > 0 ? (
-              <div className="panel-section">
-                <h3>Proofs</h3>
-                <ul className="panel-proofs">
-                  {node.proofs.map((proof) => (
-                    <li key={proof.name}>
-                      {proof.href ? (
-                        <a
-                          className="proof-name"
-                          href={proof.href}
-                          aria-label={proof.ariaLabel}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          {proof.name}
-                        </a>
-                      ) : (
-                        <span className="proof-name">{proof.name}</span>
-                      )}
-                      <span className="proof-summary">{proof.summary}</span>
-                    </li>
+              {node.links.length > 0 ? (
+                <div className="panel-actions">
+                  {node.links.map((link) => (
+                    <a
+                      key={link.href}
+                      className="panel-link"
+                      data-variant={link.variant}
+                      href={link.href}
+                      aria-label={link.ariaLabel}
+                      {...(link.external ? { target: "_blank", rel: "noreferrer" } : {})}
+                    >
+                      {link.label}
+                    </a>
                   ))}
-                </ul>
-              </div>
-            ) : null}
+                </div>
+              ) : null}
 
-            {node.work.length > 0 ? (
-              <div className="panel-section">
-                <h3>Selected work</h3>
+              {node.image ? (
+                <img className="panel-image" src={node.image.src} alt={node.image.alt} />
+              ) : null}
+
+              {node.pairs.length > 0 ? (
                 <div className="panel-pair">
-                  {node.work.map((item) => (
-                    <div key={item.title}>
-                      <h4>{item.title}</h4>
-                      <p>{item.summary}</p>
-                      <p>{item.detail}</p>
-                      {item.href ? (
-                        <a
-                          className="proof-name"
-                          href={item.href}
-                          aria-label={item.ariaLabel}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          Visit project
-                        </a>
-                      ) : null}
+                  {node.pairs.map((pair) => (
+                    <div key={pair.heading}>
+                      <h4>{pair.heading}</h4>
+                      <p>{pair.body}</p>
                     </div>
                   ))}
                 </div>
-              </div>
-            ) : null}
+              ) : null}
 
-            {node.chips.length > 0 ? (
-              <ul className="panel-list" aria-label="Keywords">
-                {node.chips.map((chip) => (
-                  <li key={chip}>{chip}</li>
-                ))}
-              </ul>
-            ) : null}
-          </div>
-        </aside>
-      ))}
+              {node.proofs.length > 0 ? (
+                <div className="panel-section">
+                  <h3>Proofs</h3>
+                  <ul className="panel-proofs">
+                    {node.proofs.map((proof) => (
+                      <li key={proof.name}>
+                        {proof.href ? (
+                          <a
+                            className="proof-name"
+                            href={proof.href}
+                            aria-label={proof.ariaLabel}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            {proof.name}
+                          </a>
+                        ) : (
+                          <span className="proof-name">{proof.name}</span>
+                        )}
+                        <span className="proof-summary">{proof.summary}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+
+              {node.work.length > 0 ? (
+                <div className="panel-section">
+                  <h3>Selected work</h3>
+                  <div className="panel-pair">
+                    {node.work.map((item) => (
+                      <div key={item.title}>
+                        <h4>{item.title}</h4>
+                        <p>{item.summary}</p>
+                        <p>{item.detail}</p>
+                        {item.href ? (
+                          <a
+                            className="proof-name"
+                            href={item.href}
+                            aria-label={item.ariaLabel}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            Visit project
+                          </a>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {node.chips.length > 0 ? (
+                <ul className="panel-list" aria-label="Keywords">
+                  {node.chips.map((chip) => (
+                    <li key={chip}>{chip}</li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+          </aside>
+        );
+      })}
 
       {/* Portfolio-code overlay (enhanced path only — gated on the ddo phase). */}
       {showCode ? (

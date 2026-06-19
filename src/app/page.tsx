@@ -6,7 +6,7 @@ export const dynamic = "force-static";
 export default function Home() {
   return (
     <main aria-label="DDO">
-      <Orbit nodes={orbitNodes} pillarIds={pillarIds} dock="right" />
+      <Orbit nodes={orbitNodes} pillarIds={pillarIds} />
     </main>
   );
 }

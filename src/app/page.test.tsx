@@ -11,6 +11,8 @@ import { orbitNodes, pillarIds } from "@/data/orbit";
 import { portfolios, resolvePortfolio } from "@/data/portfolio";
 import { pillars, selectedWork } from "@/data/work";
 
+const pillarNodes = orbitNodes.filter((n) => n.kind === "pillar");
+
 function renderHome() {
   render(React.createElement(Home));
 }
@@ -23,12 +25,35 @@ function centerWordsText(): string {
   return (document.querySelector(".core-words")?.textContent ?? "").trim();
 }
 
-// Open and close all three distinct pillars — the v2 path that walks the reveal
-// FSM odd → exploring → ddo (center reads DDO; the :) trigger appears).
+function orbitRegion(): HTMLElement {
+  return screen.getByRole("region", { name: "DDO pillar orbit" });
+}
+
+// Pillar nodes live in the orbit region; dock tabs share the same labels but live
+// in the bottom strip — scope queries so the two never collide.
+function pillarButton(name: string): HTMLElement {
+  return within(orbitRegion()).getByRole("button", { name });
+}
+
+function dockStrip(): HTMLElement {
+  return screen.getByRole("group", { name: "Open pillars" });
+}
+
+function tabButton(name: string): HTMLElement {
+  return within(dockStrip()).getByRole("button", { name });
+}
+
+function panelEl(id: string): HTMLElement {
+  const el = document.getElementById(`panel-${id}`);
+  if (!el) throw new Error(`panel-${id} not found`);
+  return el;
+}
+
+// Open all three distinct pillars — walks the reveal FSM to ddo. Non-modal now,
+// so each pillar click just expands it (the prior one auto-minimizes); no close.
 async function reachDdo(user: ReturnType<typeof userEvent.setup>): Promise<void> {
   for (const pillar of pillars) {
-    await user.click(screen.getByRole("button", { name: pillar.pillar }));
-    await user.click(screen.getByRole("button", { name: /close/i }));
+    await user.click(pillarButton(pillar.pillar));
   }
   await waitFor(() => expect(coreMarkText()).toBe("DDO"));
 }
@@ -37,16 +62,14 @@ describe("DDO Hawaii Orbit", () => {
   it("opens in the odd phase: an ODD center plus one node per pillar", () => {
     renderHome();
 
-    // Center wordmark is the deterministic, server-rendered "ODD".
     expect(coreMarkText()).toBe("ODD");
     // Center is display-only (not a button) until the ddo phase.
     expect(screen.queryByRole("button", { name: /reveal/i })).not.toBeInTheDocument();
 
-    // One ring node per pillar, derived from data (N-parameterized).
     for (const pillar of pillars) {
-      expect(screen.getByRole("button", { name: pillar.pillar })).toBeInTheDocument();
+      expect(pillarButton(pillar.pillar)).toBeInTheDocument();
     }
-    expect(orbitNodes.filter((n) => n.kind === "pillar")).toHaveLength(pillarIds.length);
+    expect(pillarNodes).toHaveLength(pillarIds.length);
   });
 
   it("walks the reveal FSM: opening distinct pillars goes exploring → exploring → ddo", async () => {
@@ -57,23 +80,17 @@ describe("DDO Hawaii Orbit", () => {
     expect(document.querySelector(".orbit-core.is-sparkle")).toBeNull();
     expect(document.querySelector(".orbit-core.is-glow")).toBeNull();
 
-    // 1st distinct → exploring, sparkle, letters still ODD
-    await user.click(screen.getByRole("button", { name: pillars[0].pillar }));
-    await user.click(screen.getByRole("button", { name: /close/i }));
+    await user.click(pillarButton(pillarNodes[0].nodeLabel));
     expect(coreMarkText()).toBe("ODD");
     expect(document.querySelector(".orbit-core.is-sparkle")).not.toBeNull();
     expect(document.querySelector(".orbit-core.is-glow")).toBeNull();
 
-    // 2nd distinct → exploring, glow added, sparkle kept
-    await user.click(screen.getByRole("button", { name: pillars[1].pillar }));
-    await user.click(screen.getByRole("button", { name: /close/i }));
+    await user.click(pillarButton(pillarNodes[1].nodeLabel));
     expect(coreMarkText()).toBe("ODD");
     expect(document.querySelector(".orbit-core.is-sparkle")).not.toBeNull();
     expect(document.querySelector(".orbit-core.is-glow")).not.toBeNull();
 
-    // 3rd distinct → ddo, center reads DDO
-    await user.click(screen.getByRole("button", { name: pillars[2].pillar }));
-    await user.click(screen.getByRole("button", { name: /close/i }));
+    await user.click(pillarButton(pillarNodes[2].nodeLabel));
     expect(coreMarkText()).toBe("DDO");
   });
 
@@ -85,13 +102,11 @@ describe("DDO Hawaii Orbit", () => {
 
     await user.click(screen.getByRole("button", { name: /reveal/i }));
 
-    // finale: the three pillar words (no letter mark)
     const words = centerWordsText();
     expect(words).toContain("Design");
     expect(words).toContain("Development");
     expect(words).toContain("Optimization");
 
-    // auto-resets back to the odd start state
     await waitFor(() => expect(coreMarkText()).toBe("ODD"), { timeout: 4000 });
   }, 10000);
 
@@ -104,55 +119,85 @@ describe("DDO Hawaii Orbit", () => {
     await reachDdo(user);
     expect(screen.getByRole("button", { name: "Portfolio code" })).toBeInTheDocument();
 
-    // finale → reset clears the trigger
     await user.click(screen.getByRole("button", { name: /reveal/i }));
     await waitFor(() => expect(coreMarkText()).toBe("ODD"), { timeout: 4000 });
     expect(screen.queryByRole("button", { name: "Portfolio code" })).not.toBeInTheDocument();
   }, 10000);
 
-  it("opens an accessible panel with each pillar's content", async () => {
+  it("docks a clicked pillar as an expanded labelled region with its content", async () => {
+    const user = userEvent.setup();
+    renderHome();
+    const node = pillarNodes[0];
+
+    await user.click(pillarButton(node.nodeLabel));
+
+    const panel = panelEl(node.id);
+    expect(panel).toHaveAttribute("data-state", "expanded");
+    expect(panel).toHaveAttribute("role", "region");
+    expect(within(panel).getByText(node.title)).toBeInTheDocument(); // its one-liner
+
+    const tab = tabButton(node.nodeLabel);
+    expect(tab).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("keeps exactly one pillar expanded at a time", async () => {
     const user = userEvent.setup();
     renderHome();
 
-    for (const pillar of pillars) {
-      await user.click(screen.getByRole("button", { name: pillar.pillar }));
-      const dialog = screen.getByRole("dialog");
-      expect(within(dialog).getByText(pillar.statement)).toBeInTheDocument();
-      for (const proof of pillar.proofs) {
-        expect(within(dialog).getAllByText(proof.name).length).toBeGreaterThan(0);
-      }
-      await user.click(within(dialog).getByRole("button", { name: /close/i }));
+    await user.click(pillarButton(pillarNodes[0].nodeLabel));
+    await user.click(pillarButton(pillarNodes[1].nodeLabel));
+
+    expect(panelEl(pillarNodes[0].id)).toHaveAttribute("data-state", "minimized");
+    expect(panelEl(pillarNodes[1].id)).toHaveAttribute("data-state", "expanded");
+    expect(tabButton(pillarNodes[0].nodeLabel)).toHaveAttribute("aria-expanded", "false");
+    expect(tabButton(pillarNodes[1].nodeLabel)).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("accumulates up to three tabs and re-expands from a tab", async () => {
+    const user = userEvent.setup();
+    renderHome();
+
+    for (const node of pillarNodes) {
+      await user.click(pillarButton(node.nodeLabel));
     }
+    expect(within(dockStrip()).getAllByRole("button")).toHaveLength(pillarNodes.length);
+    expect(panelEl(pillarNodes[2].id)).toHaveAttribute("data-state", "expanded");
+
+    // re-expand the first pillar from its tab; the prior one minimizes
+    await user.click(tabButton(pillarNodes[0].nodeLabel));
+    expect(panelEl(pillarNodes[0].id)).toHaveAttribute("data-state", "expanded");
+    expect(panelEl(pillarNodes[2].id)).toHaveAttribute("data-state", "minimized");
+  });
+
+  it("Escape minimizes the expanded panel and leaves the orbit live", async () => {
+    const user = userEvent.setup();
+    renderHome();
+
+    await user.click(pillarButton(pillarNodes[0].nodeLabel));
+    expect(panelEl(pillarNodes[0].id)).toHaveAttribute("data-state", "expanded");
+
+    await user.keyboard("{Escape}");
+    await waitFor(() =>
+      expect(panelEl(pillarNodes[0].id)).toHaveAttribute("data-state", "minimized"),
+    );
+    expect(orbitRegion()).toBeInTheDocument();
+    expect(tabButton(pillarNodes[0].nodeLabel)).toHaveAttribute("aria-expanded", "false");
   });
 
   it("surfaces the selected work inside its pillar panel", async () => {
     const user = userEvent.setup();
     renderHome();
 
-    for (const pillar of pillars) {
-      const work = selectedWork.filter((item) => item.pillar === pillar.pillar);
+    for (const node of pillarNodes) {
+      const work = selectedWork.filter((item) => item.pillar === node.nodeLabel);
       if (work.length === 0) continue;
-      await user.click(screen.getByRole("button", { name: pillar.pillar }));
-      const dialog = screen.getByRole("dialog");
+      await user.click(pillarButton(node.nodeLabel));
+      const panel = panelEl(node.id);
       for (const item of work) {
-        expect(within(dialog).getAllByText(item.title).length).toBeGreaterThan(0);
-        expect(within(dialog).getByText(item.summary)).toBeInTheDocument();
+        expect(within(panel).getAllByText(item.title).length).toBeGreaterThan(0);
+        expect(within(panel).getByText(item.summary)).toBeInTheDocument();
       }
-      await user.click(within(dialog).getByRole("button", { name: /close/i }));
     }
-  });
-
-  it("Escape closes the panel and returns focus to the node", async () => {
-    const user = userEvent.setup();
-    renderHome();
-
-    const designNode = screen.getByRole("button", { name: "Design" });
-    await user.click(designNode);
-    expect(screen.getByRole("dialog")).toBeInTheDocument();
-
-    await user.keyboard("{Escape}");
-    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-    expect(designNode).toHaveFocus();
   });
 
   it("opens the portfolio-code overlay with three letter slots", async () => {
@@ -203,12 +248,10 @@ describe("DDO Hawaii Orbit", () => {
   });
 
   it("looks up codes generically over the registry (a second entry resolves too)", () => {
-    // real registry
     expect(resolvePortfolio("tim")).toEqual(portfolios[0]);
     expect(resolvePortfolio("  TIM  ")).toEqual(portfolios[0]); // normalized
     expect(resolvePortfolio("zzz")).toBeNull();
 
-    // a fake multi-entry registry — proves the lookup isn't hardcoded to "tim"
     const fake = [
       { code: "abc", name: "Ada B.", portfolioUrl: "https://ada.example" },
       { code: "xyz", name: "Xan Y.", portfolioUrl: "https://xan.example" },
@@ -290,13 +333,26 @@ describe("DDO Hawaii Orbit", () => {
     }
   });
 
+  it("renders all pillar content in the static HTML (no-JS fallback); dock is client-only", () => {
+    renderHome();
+
+    // every pillar's content region is present (the stacked no-JS fallback)
+    for (const node of pillarNodes) {
+      const panel = panelEl(node.id);
+      expect(within(panel).getByText(node.title)).toBeInTheDocument();
+    }
+    // the dock chrome only exists after a client interaction
+    expect(screen.queryByRole("group", { name: "Open pillars" })).not.toBeInTheDocument();
+  });
+
   it("has an accessible orbit, footer, and image alt text", () => {
     renderHome();
 
     expect(screen.getByRole("main")).toBeInTheDocument();
     // the three pillar nodes are real buttons (the center is display-only until ddo).
-    expect(screen.getAllByRole("button").length).toBeGreaterThanOrEqual(pillars.length);
-    // all panel headings exist in the static HTML (present though collapsed).
+    expect(within(orbitRegion()).getAllByRole("button").length).toBeGreaterThanOrEqual(
+      pillars.length,
+    );
     expect(screen.getAllByRole("heading", { hidden: true }).length).toBeGreaterThanOrEqual(6);
 
     const images = screen.getAllByRole("img", { hidden: true });

@@ -447,12 +447,8 @@ button.orbit-core:focus-visible {
   presentation: every panel is a static, stacked, readable block — a non-orbital
   path through all content (and the SSR-parity baseline). When JS is available a
   beforeInteractive flag adds `.js` to <html>, and the `.js` rules turn the panels
-  into animated edge-docked dialogs that open one at a time.
+  into a non-modal bottom dock — one expanded panel above a strip of tabs.
 */
-.panel-scrim {
-  display: none;
-}
-
 .info-panel {
   position: relative;
   z-index: 1;
@@ -466,66 +462,85 @@ button.orbit-core:focus-visible {
   display: none;
 }
 
-.js .panel-scrim {
+/* JS dock: panels are hidden unless docked-expanded, then they render as a
+   non-modal region above the bottom tab strip. */
+.js .info-panel {
+  display: none;
+}
+
+.js .info-panel[data-state="expanded"] {
   display: block;
   position: fixed;
-  inset: 0;
-  z-index: 20;
-  opacity: 0;
-  pointer-events: none;
-  background: rgb(var(--color-scrim) / 0.22);
-  transition: opacity 0.28s ease;
-}
-
-.js .panel-scrim[data-open="true"] {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.js .info-panel {
-  position: fixed;
-  z-index: 30;
+  left: 50%;
+  bottom: 54px;
+  transform: translateX(-50%);
+  z-index: 29;
+  width: min(720px, 96vw);
+  max-height: min(62svh, 540px);
+  overflow-y: auto;
   background: rgb(var(--color-panel) / 0.82);
-  border: 0;
+  border: 1px solid rgb(var(--color-line) / 0.2);
+  border-bottom: 0;
+  border-radius: 16px 16px 0 0;
   -webkit-backdrop-filter: blur(34px);
   backdrop-filter: blur(34px);
-  box-shadow: 0 32px 90px rgb(var(--color-shadow) / 0.36);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.28s ease, transform 0.46s cubic-bezier(0.2, 0.78, 0.18, 1);
+  box-shadow: 0 -24px 70px rgb(var(--color-shadow) / 0.4);
+}
+
+.js .info-panel[data-state="expanded"]:focus {
+  outline: 0;
 }
 
 .js .info-panel .close-panel {
   display: block;
 }
 
-.js .info-panel[data-dock="right"] {
-  top: 0;
-  right: 0;
-  width: min(468px, 92vw);
-  height: 100svh;
-  border-left: 1px solid rgb(var(--color-line) / 0.2);
-  transform: translateX(104%);
+/* bottom tab strip — one tab per opened pillar (client-only) */
+.dock-strip {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 96vw;
+  z-index: 30;
+  display: flex;
+  gap: 8px;
+  padding: 0 8px;
+  overflow-x: auto;
 }
 
-.js .info-panel[data-dock="left"] {
-  top: 0;
-  left: 0;
-  width: min(468px, 92vw);
-  height: 100svh;
-  border-right: 1px solid rgb(var(--color-line) / 0.2);
-  transform: translateX(-104%);
+.dock-tab {
+  flex: 0 0 auto;
+  min-height: 42px;
+  padding: 9px 18px;
+  border: 1px solid rgb(var(--color-ink) / 0.22);
+  border-bottom: 0;
+  border-radius: 12px 12px 0 0;
+  background: rgb(var(--color-surface) / 0.6);
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+  color: rgb(var(--color-ink) / 0.8);
+  font-family: var(--font-display);
+  font-size: 15px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 0.18s ease, border-color 0.18s ease, background 0.18s ease,
+    transform 0.18s ease;
 }
 
-.js .info-panel[hidden] {
-  display: none;
+.dock-tab:hover,
+.dock-tab:focus-visible {
+  outline: 0;
+  color: rgb(var(--color-ink));
+  border-color: rgb(var(--active-accent));
+  transform: translateY(-2px);
 }
 
-.js .info-panel[data-open="true"] {
-  display: block;
-  opacity: 1;
-  pointer-events: auto;
-  transform: translate(0, 0);
+.dock-tab[data-state="expanded"] {
+  color: rgb(var(--color-accent-ink));
+  background: rgb(var(--color-ink));
+  border-color: rgb(var(--active-accent));
 }
 
 .panel-inner {
@@ -781,10 +796,10 @@ button.orbit-core:focus-visible {
 /* ---- portfolio-code easter egg ---- */
 
 .code-trigger {
-  position: absolute;
-  bottom: clamp(16px, 4vw, 34px);
-  left: 50%;
-  transform: translateX(-50%);
+  position: fixed;
+  bottom: 8px;
+  right: clamp(12px, 4vw, 28px);
+  z-index: 31;
   min-height: 40px;
   padding: 6px 18px;
   border: 1px solid rgb(var(--color-ink) / 0.22);
@@ -806,7 +821,7 @@ button.orbit-core:focus-visible {
   outline: 0;
   border-color: rgb(var(--color-brass));
   color: rgb(var(--color-ink));
-  transform: translateX(-50%) translateY(-2px);
+  transform: translateY(-2px);
 }
 
 .code-overlay {
@@ -976,7 +991,7 @@ button.orbit-core:focus-visible {
   .pillar,
   .core-letter,
   .info-panel,
-  .panel-scrim,
+  .dock-tab,
   .code-slot,
   .code-trigger {
     transition-duration: 0.01ms;
@@ -1019,18 +1034,13 @@ button.orbit-core:focus-visible {
     width: clamp(106px, 31vw, 138px);
   }
 
-  /* panels dock to the bottom on small screens */
-  .js .info-panel[data-dock] {
-    top: auto;
+  /* the expanded panel is a full-width bottom sheet above the strip on mobile */
+  .js .info-panel[data-state="expanded"] {
     left: 0;
     right: 0;
-    bottom: 0;
+    transform: none;
     width: auto;
-    height: auto;
-    max-height: 80svh;
-    border: 0;
-    border-top: 1px solid rgb(var(--color-line) / 0.2);
-    transform: translateY(104%);
+    max-height: 68svh;
   }
 
   .panel-inner {
