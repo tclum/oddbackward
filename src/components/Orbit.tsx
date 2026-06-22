@@ -39,6 +39,12 @@ const FALL_MS = 650;
 const EXPAND_MS = 340;
 const TAB_DELAY_MS = 800;
 
+// Center mark morph (ODD ↔ DDO): the single O arcs from the front slot to the
+// back while the two D's slide left one slot. PEAK_RATIO is the O's lift at the
+// arc midpoint, as a fraction of the glyph height.
+const MORPH_MS = 520;
+const PEAK_RATIO = 0.6;
+
 // A clone of a clicked orbit node, falling away as the panel takes over.
 type FallingNode = {
   key: number;
@@ -162,6 +168,10 @@ export function Orbit({ nodes, pillarIds }: OrbitProps) {
 
   const panelRefs = useRef(new Map<string, HTMLElement | null>());
   const tabRefs = useRef(new Map<string, HTMLButtonElement | null>());
+  // Center-mark glyph elements + their last-known rects (keyed by glyph identity,
+  // so the FLIP survives the div↔button remount across odd↔ddo).
+  const glyphEls = useRef(new Map<string, HTMLElement>());
+  const glyphRects = useRef(new Map<string, DOMRect>());
   // The element (orbit pillar or dock tab) that expanded the panel: its rect is
   // the animation origin, and its kind selects the fall vs grow animation.
   const lastTrigger = useRef<{ rect: DOMRect; kind: "pillar" | "tab" } | null>(null);
@@ -326,6 +336,63 @@ export function Orbit({ nodes, pillarIds }: OrbitProps) {
     };
   }, [expandedId]);
 
+  // Morph the center mark across ODD ↔ DDO: FLIP each glyph from its prior slot to
+  // its new one — the two D's slide left, the O arcs front→back over the word.
+  // Keyed by glyph identity, so the rects survive the div↔button remount. The
+  // forward (ODD→DDO) morph is the visible one; the reverse derives from phase and
+  // resets cleanly. Visual-only; no-ops under reduced-motion / zero rects (jsdom) /
+  // no WAAPI — glyphs still render in the correct order so textContent is unchanged.
+  useIsomorphicLayoutEffect(() => {
+    const keys = ["O", "D1", "D2"];
+    const els = keys.map((key) => glyphEls.current.get(key));
+    if (els.some((el) => !el)) {
+      // mark not mounted (finale) — drop baselines so the next mount re-baselines
+      glyphRects.current.clear();
+      return;
+    }
+    const elements = els as HTMLElement[];
+    const lasts = elements.map((el) => el.getBoundingClientRect());
+    const canMorph =
+      !prefersReducedMotion() &&
+      typeof elements[0].animate === "function" &&
+      lasts.every((rect) => rect.width > 0 && rect.height > 0);
+
+    if (canMorph) {
+      const peak = lasts[0].height * PEAK_RATIO; // lasts[0] is the O
+      keys.forEach((key, i) => {
+        const el = elements[i];
+        const last = lasts[i];
+        const first = glyphRects.current.get(key);
+        if (!first) return;
+        const dx = first.left - last.left;
+        const dy = first.top - last.top;
+        if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return;
+        if (key === "O") {
+          el.style.zIndex = "1"; // pass in front of the D's during the arc
+          const anim = el.animate(
+            [
+              { transform: `translate(${dx}px, ${dy}px)`, offset: 0 },
+              { transform: `translate(${dx / 2}px, ${dy / 2 - peak}px)`, offset: 0.5 },
+              { transform: "none", offset: 1 },
+            ],
+            { duration: MORPH_MS, easing: "ease-in-out", fill: "none" },
+          );
+          anim.onfinish = () => {
+            el.style.zIndex = "";
+          };
+        } else {
+          el.animate([{ transform: `translateX(${dx}px)` }, { transform: "none" }], {
+            duration: MORPH_MS,
+            easing: "ease-in-out",
+            fill: "none",
+          });
+        }
+      });
+    }
+
+    keys.forEach((key, i) => glyphRects.current.set(key, lasts[i]));
+  }, [phase]);
+
   // Escape minimizes the expanded panel (non-modal — the orbit stays live).
   useEffect(() => {
     if (!expandedId) return;
@@ -468,7 +535,20 @@ export function Orbit({ nodes, pillarIds }: OrbitProps) {
   // Only the code overlay is modal: it inerts the orbit and pauses rotation.
   const showCode = phase === "ddo";
 
-  const centerLetters = phase === "ddo" ? "DDO" : "ODD"; // odd / exploring → ODD
+  // Same three glyphs (one O, two D's) reordered by phase, with stable keys so
+  // each travels along its path. odd/exploring → "ODD"; ddo → "DDO".
+  const markGlyphs =
+    phase === "ddo"
+      ? [
+          { key: "D1", char: "D" },
+          { key: "D2", char: "D" },
+          { key: "O", char: "O" },
+        ]
+      : [
+          { key: "O", char: "O" },
+          { key: "D1", char: "D" },
+          { key: "D2", char: "D" },
+        ];
   const centerAnnounce =
     phase === "finale" ? `${pillarWords.join(". ")}.` : phase === "ddo" ? "DDO" : "ODD";
   const coreClassName = ["orbit-core", sparkle ? "is-sparkle" : "", glow ? "is-glow" : ""]
@@ -497,9 +577,16 @@ export function Orbit({ nodes, pillarIds }: OrbitProps) {
         </span>
       ) : (
         <strong className="core-mark" aria-hidden="true">
-          {centerLetters.split("").map((letter, i) => (
-            <span className="core-letter" key={i}>
-              {letter}
+          {markGlyphs.map((glyph) => (
+            <span
+              className="core-letter"
+              key={glyph.key}
+              ref={(el) => {
+                if (el) glyphEls.current.set(glyph.key, el);
+                else glyphEls.current.delete(glyph.key);
+              }}
+            >
+              {glyph.char}
             </span>
           ))}
         </strong>
