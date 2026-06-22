@@ -42,6 +42,15 @@ const TAB_DELAY_MS = 800;
 const MORPH_MS = 520;
 const PEAK_RATIO = 0.6;
 
+// Finale choreography (a sequenced title-card beat): the words rise from the
+// orbit center, grow large, and spread across the top (WORDS_RISE_MS); hold there
+// (WORDS_HOLD_MS); fall straight down and fade (WORDS_FALL_MS); and ONLY THEN the
+// popup rises from the bottom (POPUP_RISE_MS).
+const WORDS_RISE_MS = 600;
+const WORDS_HOLD_MS = 1500;
+const WORDS_FALL_MS = 520;
+const POPUP_RISE_MS = 460;
+
 // A clone of a clicked orbit node, falling away as the panel takes over.
 type FallingNode = {
   key: number;
@@ -157,6 +166,12 @@ export function Orbit({ nodes, pillarIds }: OrbitProps) {
   const [revealedTabs, setRevealedTabs] = useState<Set<string>>(() => new Set());
   const revealTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
+  // Finale sequence: the words title-card plays first (showFinaleWords), then the
+  // popup is gated behind the whole moment (showFinalePanel).
+  const [showFinaleWords, setShowFinaleWords] = useState(false);
+  const [showFinalePanel, setShowFinalePanel] = useState(false);
+  const finaleTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
+
   // Portfolio-code easter egg — gated on the `ddo` phase.
   const [codeOpen, setCodeOpen] = useState(false);
   const [slots, setSlots] = useState<string[]>(() => Array(CODE_LENGTH).fill(""));
@@ -182,6 +197,10 @@ export function Orbit({ nodes, pillarIds }: OrbitProps) {
   const centerButtonRef = useRef<HTMLButtonElement | null>(null);
   const finalePopupRef = useRef<HTMLDivElement | null>(null);
   const finaleCloseRef = useRef<HTMLButtonElement | null>(null);
+  const finaleWordsRef = useRef<HTMLDivElement | null>(null);
+  // The DDO mark's rect, captured pre-commit at the finale click — the FLIP origin
+  // the risen words travel up from.
+  const finaleMarkRect = useRef<DOMRect | null>(null);
 
   useEffect(() => setMounted(true), []);
 
@@ -226,6 +245,10 @@ export function Orbit({ nodes, pillarIds }: OrbitProps) {
   // finale invocation, not at ddo entry — so the third pillar's still-running
   // fall/unfold/tab-reveal aren't interrupted.
   const invokeFinale = useCallback(() => {
+    // Snapshot the DDO mark rect BEFORE the commit (the glyphs unmount and
+    // glyphRects is wiped post-commit). This is the words' FLIP origin.
+    const markEl = document.querySelector<HTMLElement>(".core-mark");
+    finaleMarkRect.current = markEl ? markEl.getBoundingClientRect() : null;
     dispatch({ type: "CENTER_CLICK" });
     dockDispatch({ type: "RESET" });
     revealTimers.current.forEach(clearTimeout);
@@ -235,18 +258,23 @@ export function Orbit({ nodes, pillarIds }: OrbitProps) {
 
   const dismissFinale = useCallback(() => dispatch({ type: "RESET" }), []);
 
-  // Finale focus: into the popup (close button) on open, back to the stable
-  // center button on dismiss — so focus never drops to <body>.
+  // Restore focus to the stable center button when the finale ends (never <body>).
+  // During the words-only moment the center button keeps the focus it had from the
+  // click (orbit-stage isn't inert yet); focus only moves into the popup once it
+  // appears (the showFinalePanel effect below).
   const prevFinale = useRef(false);
   useEffect(() => {
     const isFinale = phase === "finale";
-    if (isFinale) {
-      finaleCloseRef.current?.focus({ preventScroll: true });
-    } else if (prevFinale.current) {
+    if (!isFinale && prevFinale.current) {
       centerButtonRef.current?.focus({ preventScroll: true });
     }
     prevFinale.current = isFinale;
   }, [phase]);
+
+  // Move focus into the popup (close button) when it appears.
+  useEffect(() => {
+    if (showFinalePanel) finaleCloseRef.current?.focus({ preventScroll: true });
+  }, [showFinalePanel]);
 
   // Escape dismisses the finale.
   useEffect(() => {
@@ -446,6 +474,87 @@ export function Orbit({ nodes, pillarIds }: OrbitProps) {
     keys.forEach((key, i) => glyphRects.current.set(key, lasts[i]));
   }, [phase]);
 
+  // Whether the finale plays plainly (no animation) — reduced-motion or no WAAPI
+  // (jsdom has no Element.prototype.animate, so it takes this path). When skipping,
+  // the words AND popup appear at their resting positions at once, synchronously.
+  const finaleSkips = () =>
+    prefersReducedMotion() || typeof Element.prototype.animate !== "function";
+
+  const clearFinaleTimers = useCallback(() => {
+    finaleTimers.current.forEach(clearTimeout);
+    finaleTimers.current = [];
+  }, []);
+
+  // Finale entry: set up the sequence. Animated → words first (panel gated behind
+  // the moment). Skip → words + panel both shown instantly. Leaving finale resets.
+  useIsomorphicLayoutEffect(() => {
+    if (phase !== "finale") {
+      clearFinaleTimers();
+      setShowFinaleWords(false);
+      setShowFinalePanel(false);
+      return;
+    }
+    setShowFinaleWords(true);
+    setShowFinalePanel(finaleSkips() ? true : false);
+  }, [phase, clearFinaleTimers]);
+
+  // Words title-card: rise + grow from the captured mark rect to the large top
+  // row, hold, then fall + fade; afterwards unmount the words and reveal the popup.
+  useIsomorphicLayoutEffect(() => {
+    if (phase !== "finale" || !showFinaleWords || finaleSkips()) return;
+    const wordsEl = finaleWordsRef.current;
+    const markRect = finaleMarkRect.current;
+    if (!wordsEl || !markRect || markRect.width <= 0 || markRect.height <= 0) return;
+    const last = wordsEl.getBoundingClientRect();
+    if (last.width <= 0 || last.height <= 0) return;
+
+    // FLIP: appear small (mark-sized) at the orbit center, then grow + rise.
+    const scale = Math.min(markRect.height / last.height, 1);
+    const dx = markRect.left + markRect.width / 2 - (last.left + last.width / 2);
+    const dy = markRect.top + markRect.height / 2 - (last.top + last.height / 2);
+    wordsEl.animate(
+      [
+        { transform: `translate(${dx}px, ${dy}px) scale(${scale})`, opacity: 0, offset: 0 },
+        { transform: "none", opacity: 1, offset: 1 },
+      ],
+      { duration: WORDS_RISE_MS, easing: "cubic-bezier(0.2, 0.7, 0.2, 1)", fill: "none" },
+    );
+
+    const fall = setTimeout(() => {
+      const el = finaleWordsRef.current;
+      if (!el) return;
+      el.animate(
+        [
+          { transform: "none", opacity: 1 },
+          { transform: `translateY(${window.innerHeight * 0.4}px)`, opacity: 0 },
+        ],
+        { duration: WORDS_FALL_MS, easing: "cubic-bezier(0.4, 0, 1, 0.4)", fill: "forwards" },
+      );
+    }, WORDS_RISE_MS + WORDS_HOLD_MS);
+
+    const swap = setTimeout(() => {
+      setShowFinaleWords(false);
+      setShowFinalePanel(true);
+    }, WORDS_RISE_MS + WORDS_HOLD_MS + WORDS_FALL_MS);
+
+    finaleTimers.current = [fall, swap];
+    return clearFinaleTimers;
+  }, [phase, showFinaleWords, clearFinaleTimers]);
+
+  // The popup rises from below once it appears (after the words moment).
+  useIsomorphicLayoutEffect(() => {
+    if (!showFinalePanel || finaleSkips()) return;
+    const popupEl = finalePopupRef.current;
+    if (!popupEl || !popupEl.getBoundingClientRect().height) return;
+    popupEl.animate(
+      [
+        { transform: "translateY(40px)", opacity: 0 },
+        { transform: "none", opacity: 1 },
+      ],
+      { duration: POPUP_RISE_MS, easing: "cubic-bezier(0.2, 0.7, 0.2, 1)", fill: "none" },
+    );
+  }, [showFinalePanel]);
+
   // Escape minimizes the expanded panel (non-modal — the orbit stays live).
   useEffect(() => {
     if (!expandedId) return;
@@ -590,6 +699,9 @@ export function Orbit({ nodes, pillarIds }: OrbitProps) {
   const showCode = phase === "ddo";
   const finaleOpen = phase === "finale";
   const modalOpen = codeOpen || finaleOpen;
+  // The orbit-stage only goes inert once the popup is up — during the words-only
+  // moment it stays live so the center button keeps focus.
+  const stageInert = codeOpen || (finaleOpen && showFinalePanel);
 
   // Same three glyphs (one O, two D's) reordered by phase, with stable keys so
   // each travels along its path. odd/exploring → "ODD"; ddo → "DDO".
@@ -623,15 +735,9 @@ export function Orbit({ nodes, pillarIds }: OrbitProps) {
       <span className="core-label" aria-hidden="true">
         Center
       </span>
-      {phase === "finale" ? (
-        <span className="core-words" aria-hidden="true">
-          {pillarWords.map((word) => (
-            <span className="core-word" key={word}>
-              {word}
-            </span>
-          ))}
-        </span>
-      ) : (
+      {/* In finale the words have left the center for the top band (rendered as a
+          top-level element, outside .orbit-page's stacking context). */}
+      {phase === "finale" ? null : (
         <strong className="core-mark" aria-hidden="true">
           {markGlyphs.map((glyph) => (
             <span
@@ -653,7 +759,7 @@ export function Orbit({ nodes, pillarIds }: OrbitProps) {
   return (
     <>
       <div className="orbit-page" data-overlay-open={modalOpen ? "true" : undefined}>
-        <section className="orbit-stage" aria-label="DDO pillar orbit" inert={modalOpen || undefined}>
+        <section className="orbit-stage" aria-label="DDO pillar orbit" inert={stageInert || undefined}>
           <div className="orbit-shell">
             <span className="orbit-rim" aria-hidden="true" />
             <div className="orbit-track">
@@ -1007,12 +1113,29 @@ export function Orbit({ nodes, pillarIds }: OrbitProps) {
         </div>
       ) : null}
 
-      {/* Finale popup — the terminal moment: a modal dialog surfacing the center
-          node's CTA content. Held until dismissed (close / Escape / click-away).
-          Plain show/hide; the rise-from-bottom choreography is 3c-ii. */}
+      {/* Finale — a sequenced title-card: the words play across the top first, then
+          the popup (a modal dialog with the center node's CTA content) rises behind
+          them, gated by showFinalePanel. Held until dismissed. The scrim spans the
+          whole finale, dimming the orbit behind both the words and the popup. */}
       {finaleOpen && center ? (
         <>
           <div className="finale-scrim" aria-hidden="true" />
+
+          {/* The three words as a large top-row title card. Top-level (z above the
+              scrim) so they escape .orbit-page's stacking context. Keeps the
+              .core-words class (the test contract); decorative — the popup carries
+              the semantics. */}
+          {showFinaleWords ? (
+            <div className="finale-words core-words" aria-hidden="true" ref={finaleWordsRef}>
+              {pillarWords.map((word) => (
+                <span className="finale-word core-word" key={word}>
+                  {word}
+                </span>
+              ))}
+            </div>
+          ) : null}
+
+          {showFinalePanel ? (
           <div
             className="finale-popup"
             role="dialog"
@@ -1067,6 +1190,7 @@ export function Orbit({ nodes, pillarIds }: OrbitProps) {
               ) : null}
             </div>
           </div>
+          ) : null}
         </>
       ) : null}
     </>

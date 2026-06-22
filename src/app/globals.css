@@ -981,6 +981,37 @@ button.orbit-core:not([aria-disabled="true"]):hover {
   box-shadow: 0 -24px 70px rgb(var(--color-shadow) / 0.4);
 }
 
+/* The risen words: a large horizontal title-card row across the top, ABOVE the
+   scrim (z 35) so it escapes .orbit-page's stacking context. Keeps the .core-words
+   class (test contract) but overrides it from a small centered column to a big
+   spread row. Declared after .core-words so it wins ties. */
+.finale-words {
+  position: fixed;
+  top: clamp(10px, 6vh, 60px);
+  left: 0;
+  right: 0;
+  z-index: 35;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(4px, 1.5vh, 16px);
+  padding-inline: clamp(12px, 4vw, 48px);
+  font-size: clamp(30px, 8vw, 84px);
+  line-height: 1;
+  pointer-events: none;
+}
+
+.finale-word {
+  white-space: nowrap;
+}
+
+/* Short viewports: lower the bottom popup so the risen words (top) and the risen
+   popup (bottom) never meet (~400px-tall landscape is the tight case). */
+@media (max-height: 520px) {
+  .finale-popup {
+    max-height: 58svh;
+  }
+}
+
 /* ---- animations ---- */
 
 @keyframes orbitCounterClockwise {
