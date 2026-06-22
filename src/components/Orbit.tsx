@@ -25,9 +25,6 @@ type OrbitProps = {
 // Three letter-slots, echoing the three-glyph wordmark / 3-letter portfolio codes.
 const CODE_LENGTH = 3;
 
-// How long the finale words hold before the FSM resets to the odd start state.
-const FINALE_MS = 2000;
-
 // Tab re-expand: a single FLIP grow from the tab into the dock panel.
 const FLIP_MS = 420;
 
@@ -179,6 +176,12 @@ export function Orbit({ nodes, pillarIds }: OrbitProps) {
   const codeOverlayRef = useRef<HTMLDivElement | null>(null);
   const slotRefs = useRef<(HTMLInputElement | null)[]>([]);
   const shakeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // The center is always a button now (stable click/focus target). The finale
+  // popup is a modal dialog; focus moves into it on open and back to the center
+  // button on dismiss.
+  const centerButtonRef = useRef<HTMLButtonElement | null>(null);
+  const finalePopupRef = useRef<HTMLDivElement | null>(null);
+  const finaleCloseRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => setMounted(true), []);
 
@@ -192,13 +195,6 @@ export function Orbit({ nodes, pillarIds }: OrbitProps) {
     },
     [],
   );
-
-  // Finale holds the three words, then resets to the odd start state.
-  useEffect(() => {
-    if (phase !== "finale") return;
-    const timer = setTimeout(() => dispatch({ type: "RESET" }), FINALE_MS);
-    return () => clearTimeout(timer);
-  }, [phase]);
 
   // The odd start state has no dock — clear it whenever the FSM returns to odd.
   useEffect(() => {
@@ -225,6 +221,63 @@ export function Orbit({ nodes, pillarIds }: OrbitProps) {
   }, []);
 
   const minimize = useCallback(() => dockDispatch({ type: "MINIMIZE" }), []);
+
+  // Enter the finale (from the ddo center click). Clears the dock HERE — at the
+  // finale invocation, not at ddo entry — so the third pillar's still-running
+  // fall/unfold/tab-reveal aren't interrupted.
+  const invokeFinale = useCallback(() => {
+    dispatch({ type: "CENTER_CLICK" });
+    dockDispatch({ type: "RESET" });
+    revealTimers.current.forEach(clearTimeout);
+    revealTimers.current = [];
+    setRevealedTabs(new Set());
+  }, []);
+
+  const dismissFinale = useCallback(() => dispatch({ type: "RESET" }), []);
+
+  // Finale focus: into the popup (close button) on open, back to the stable
+  // center button on dismiss — so focus never drops to <body>.
+  const prevFinale = useRef(false);
+  useEffect(() => {
+    const isFinale = phase === "finale";
+    if (isFinale) {
+      finaleCloseRef.current?.focus({ preventScroll: true });
+    } else if (prevFinale.current) {
+      centerButtonRef.current?.focus({ preventScroll: true });
+    }
+    prevFinale.current = isFinale;
+  }, [phase]);
+
+  // Escape dismisses the finale.
+  useEffect(() => {
+    if (phase !== "finale") return;
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        dismissFinale();
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [phase, dismissFinale]);
+
+  // Click-away dismisses the finale (anything outside the popup / easter egg).
+  useEffect(() => {
+    if (phase !== "finale") return;
+    function onClick(event: MouseEvent) {
+      const target = event.target as HTMLElement | null;
+      if (
+        target?.closest(".finale-popup") ||
+        target?.closest(".code-trigger") ||
+        target?.closest(".code-overlay")
+      ) {
+        return;
+      }
+      dismissFinale();
+    }
+    document.addEventListener("click", onClick);
+    return () => document.removeEventListener("click", onClick);
+  }, [phase, dismissFinale]);
 
   // Move focus to the expanded panel on expand; back to its tab on minimize.
   const prevExpandedId = useRef<string | null>(null);
@@ -532,8 +585,11 @@ export function Orbit({ nodes, pillarIds }: OrbitProps) {
     if (shakeTimer.current) clearTimeout(shakeTimer.current);
   }, []);
 
-  // Only the code overlay is modal: it inerts the orbit and pauses rotation.
+  // The code overlay and the finale popup are modal: they inert the orbit and
+  // pause rotation behind them.
   const showCode = phase === "ddo";
+  const finaleOpen = phase === "finale";
+  const modalOpen = codeOpen || finaleOpen;
 
   // Same three glyphs (one O, two D's) reordered by phase, with stable keys so
   // each travels along its path. odd/exploring → "ODD"; ddo → "DDO".
@@ -596,8 +652,8 @@ export function Orbit({ nodes, pillarIds }: OrbitProps) {
 
   return (
     <>
-      <div className="orbit-page" data-overlay-open={codeOpen ? "true" : undefined}>
-        <section className="orbit-stage" aria-label="DDO pillar orbit" inert={codeOpen || undefined}>
+      <div className="orbit-page" data-overlay-open={modalOpen ? "true" : undefined}>
+        <section className="orbit-stage" aria-label="DDO pillar orbit" inert={modalOpen || undefined}>
           <div className="orbit-shell">
             <span className="orbit-rim" aria-hidden="true" />
             <div className="orbit-track">
@@ -666,18 +722,18 @@ export function Orbit({ nodes, pillarIds }: OrbitProps) {
             </div>
 
             {center ? (
-              phase === "ddo" ? (
-                <button
-                  type="button"
-                  className={coreClassName}
-                  aria-label="Reveal Design, Development, Optimization"
-                  onClick={() => dispatch({ type: "CENTER_CLICK" })}
-                >
-                  {coreContent}
-                </button>
-              ) : (
-                <div className={coreClassName}>{coreContent}</div>
-              )
+              <button
+                type="button"
+                className={coreClassName}
+                ref={centerButtonRef}
+                aria-disabled={phase !== "ddo" ? true : undefined}
+                aria-label={phase === "ddo" ? "Reveal Design, Development, Optimization" : undefined}
+                onClick={() => {
+                  if (phase === "ddo") invokeFinale();
+                }}
+              >
+                {coreContent}
+              </button>
             ) : null}
           </div>
         </section>
@@ -700,7 +756,7 @@ export function Orbit({ nodes, pillarIds }: OrbitProps) {
         ) : null}
       </div>
 
-      <footer className="orbit-footer" inert={codeOpen || undefined}>
+      <footer className="orbit-footer" inert={modalOpen || undefined}>
         <p>&copy; {new Date().getFullYear()} DDO</p>
         <p>Design · Development · Optimization</p>
       </footer>
@@ -949,6 +1005,69 @@ export function Orbit({ nodes, pillarIds }: OrbitProps) {
             </form>
           </div>
         </div>
+      ) : null}
+
+      {/* Finale popup — the terminal moment: a modal dialog surfacing the center
+          node's CTA content. Held until dismissed (close / Escape / click-away).
+          Plain show/hide; the rise-from-bottom choreography is 3c-ii. */}
+      {finaleOpen && center ? (
+        <>
+          <div className="finale-scrim" aria-hidden="true" />
+          <div
+            className="finale-popup"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="finale-title"
+            ref={finalePopupRef}
+            onKeyDown={(event) => trapTab(event, finalePopupRef.current)}
+          >
+            <div className="panel-inner">
+              <button
+                type="button"
+                className="close-panel"
+                ref={finaleCloseRef}
+                onClick={dismissFinale}
+              >
+                <span className="sr-only">Close</span>
+              </button>
+
+              <p className="panel-kicker">{center.kicker}</p>
+              <h2 className="panel-title" id="finale-title">
+                {center.title}
+              </h2>
+              <p className="panel-copy">{center.copy}</p>
+              <div className="panel-rule" aria-hidden="true" />
+
+              {center.links.length > 0 ? (
+                <div className="panel-actions">
+                  {center.links.map((link) => (
+                    <a
+                      key={link.href}
+                      className="panel-link"
+                      data-variant={link.variant}
+                      href={link.href}
+                      aria-label={link.ariaLabel}
+                      {...(link.external ? { target: "_blank", rel: "noreferrer" } : {})}
+                    >
+                      {link.label}
+                    </a>
+                  ))}
+                </div>
+              ) : null}
+
+              {center.pairs.length > 0 ? (
+                <div className="panel-pair">
+                  {center.pairs.map((pair) => (
+                    <div key={pair.heading}>
+                      <h4>{pair.heading}</h4>
+                      <p>{pair.body}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </>
       ) : null}
     </>
   );

@@ -94,7 +94,7 @@ describe("DDO Hawaii Orbit", () => {
     expect(coreMarkText()).toBe("DDO");
   });
 
-  it("plays the finale on DDO click — shows the three words, then resets to ODD", async () => {
+  it("plays the finale on DDO click — words + CTA popup, held until dismissed", async () => {
     const user = userEvent.setup();
     renderHome();
     await reachDdo(user);
@@ -102,15 +102,28 @@ describe("DDO Hawaii Orbit", () => {
 
     await user.click(screen.getByRole("button", { name: /reveal/i }));
 
+    // the three words at the center (the mark is gone in finale)
+    expect(coreMarkText()).toBe("");
     const words = centerWordsText();
     expect(words).toContain("Design");
     expect(words).toContain("Development");
     expect(words).toContain("Optimization");
 
-    await waitFor(() => expect(coreMarkText()).toBe("ODD"), { timeout: 4000 });
+    // the finale popup surfaces the center node's CTA content, and holds (no
+    // auto-reset — the dialog is still present after the click).
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByRole("link", { name: "Get in touch" })).toBeInTheDocument();
+    expect(
+      within(dialog).getByRole("link", { name: "Need a website? Visit Forpono" }),
+    ).toBeInTheDocument();
+    expect(within(dialog).getByText("Run by Timothy Lum.")).toBeInTheDocument();
+
+    // dismiss via the close button → back to the odd start state
+    await user.click(within(dialog).getByRole("button", { name: /close/i }));
+    await waitFor(() => expect(coreMarkText()).toBe("ODD"));
   }, 10000);
 
-  it("gates :) on the ddo phase: hidden before, shown in ddo, gone after reset", async () => {
+  it("gates :) on the ddo phase: hidden before, shown in ddo, gone after finale dismiss", async () => {
     const user = userEvent.setup();
     renderHome();
 
@@ -119,8 +132,12 @@ describe("DDO Hawaii Orbit", () => {
     await reachDdo(user);
     expect(screen.getByRole("button", { name: "Portfolio code" })).toBeInTheDocument();
 
+    // enter the finale, then dismiss it with Escape → reset to odd
     await user.click(screen.getByRole("button", { name: /reveal/i }));
-    await waitFor(() => expect(coreMarkText()).toBe("ODD"), { timeout: 4000 });
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+
+    await waitFor(() => expect(coreMarkText()).toBe("ODD"));
     expect(screen.queryByRole("button", { name: "Portfolio code" })).not.toBeInTheDocument();
   }, 10000);
 
