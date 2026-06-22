@@ -1,9 +1,21 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+} from "react";
 import type { CSSProperties } from "react";
 import type { OrbitNode } from "@/data/orbit";
 import { resolvePortfolio } from "@/data/portfolio";
+
+// useLayoutEffect on the client, useEffect on the server (static export prerender)
+// to avoid the SSR "useLayoutEffect does nothing on the server" warning.
+const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
 type OrbitProps = {
   nodes: OrbitNode[];
@@ -15,6 +27,26 @@ const CODE_LENGTH = 3;
 
 // How long the finale words hold before the FSM resets to the odd start state.
 const FINALE_MS = 2000;
+
+// Tab re-expand: a single FLIP grow from the tab into the dock panel.
+const FLIP_MS = 420;
+
+// Pillar open: the node clone drops straight down and fades (FALL_MS); then, after
+// it has fallen, the panel unfolds upward at the bottom-center (EXPAND_MS). The
+// pillar's dock tab fades into the strip only once the node is gone (TAB_DELAY_MS,
+// which must be > FALL_MS).
+const FALL_MS = 650;
+const EXPAND_MS = 340;
+const TAB_DELAY_MS = 800;
+
+// A clone of a clicked orbit node, falling away as the panel takes over.
+type FallingNode = {
+  key: number;
+  rect: DOMRect;
+  number?: string;
+  label: string;
+  accent: string;
+};
 
 // ---- center reveal FSM (v2) ----
 // Direction is ODD -> DDO. odd is the deterministic start state (also what SSR
@@ -113,6 +145,15 @@ export function Orbit({ nodes, pillarIds }: OrbitProps) {
   const [docked, dockDispatch] = useReducer(dockReducer, []);
   const expandedId = docked.find((d) => d.state === "expanded")?.id ?? null;
 
+  // Self-removing clones of clicked orbit nodes, falling away as panels open.
+  const [fallingNodes, setFallingNodes] = useState<FallingNode[]>([]);
+  const fallKey = useRef(0);
+
+  // Pillar dock tabs reveal only after the node has fallen away (TAB_DELAY_MS);
+  // when the fall is skipped (reduced-motion / jsdom), they reveal synchronously.
+  const [revealedTabs, setRevealedTabs] = useState<Set<string>>(() => new Set());
+  const revealTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
+
   // Portfolio-code easter egg — gated on the `ddo` phase.
   const [codeOpen, setCodeOpen] = useState(false);
   const [slots, setSlots] = useState<string[]>(() => Array(CODE_LENGTH).fill(""));
@@ -121,6 +162,9 @@ export function Orbit({ nodes, pillarIds }: OrbitProps) {
 
   const panelRefs = useRef(new Map<string, HTMLElement | null>());
   const tabRefs = useRef(new Map<string, HTMLButtonElement | null>());
+  // The element (orbit pillar or dock tab) that expanded the panel: its rect is
+  // the animation origin, and its kind selects the fall vs grow animation.
+  const lastTrigger = useRef<{ rect: DOMRect; kind: "pillar" | "tab" } | null>(null);
   const codeTriggerRef = useRef<HTMLButtonElement | null>(null);
   const codeOverlayRef = useRef<HTMLDivElement | null>(null);
   const slotRefs = useRef<(HTMLInputElement | null)[]>([]);
@@ -148,8 +192,20 @@ export function Orbit({ nodes, pillarIds }: OrbitProps) {
 
   // The odd start state has no dock — clear it whenever the FSM returns to odd.
   useEffect(() => {
-    if (phase === "odd") dockDispatch({ type: "RESET" });
+    if (phase !== "odd") return;
+    dockDispatch({ type: "RESET" });
+    revealTimers.current.forEach(clearTimeout);
+    revealTimers.current = [];
+    setRevealedTabs(new Set());
   }, [phase]);
+
+  // Clear any pending tab-reveal timers on unmount.
+  useEffect(
+    () => () => {
+      revealTimers.current.forEach(clearTimeout);
+    },
+    [],
+  );
 
   // Open a pillar: advance the reveal AND dock it expanded (others minimize).
   const openPillar = useCallback((node: OrbitNode) => {
@@ -171,6 +227,104 @@ export function Orbit({ nodes, pillarIds }: OrbitProps) {
     }
     prevExpandedId.current = expandedId;
   }, [expandedId, mounted]);
+
+  // Animate the newly-expanded panel from the trigger's rect to its docked
+  // position. A dock tab grows up in a single FLIP; an orbit pillar uses a
+  // two-phase fall-then-expand (a small token drops to the bottom-center, then
+  // unfolds upward into the panel). Visual-only; guarded by reduced-motion and
+  // no-ops cleanly when rects are zero (jsdom) — the panel then just appears
+  // docked (Slice 2). EXPAND only; MINIMIZE stays instant.
+  useIsomorphicLayoutEffect(() => {
+    if (!expandedId || prefersReducedMotion()) return;
+    const panel = panelRefs.current.get(expandedId);
+    const trigger = lastTrigger.current;
+    if (!panel || !trigger) return;
+    const first = trigger.rect;
+    const last = panel.getBoundingClientRect();
+    if (!first.width || !first.height || !last.width || !last.height) return;
+    const dx = first.left - last.left;
+    const dy = first.top - last.top;
+    const sx = first.width / last.width;
+    const sy = first.height / last.height;
+    if (![dx, dy, sx, sy].every(Number.isFinite)) return;
+
+    const inner = panel.querySelector<HTMLElement>(".panel-inner");
+
+    if (trigger.kind === "tab") {
+      // Single FLIP: fly + grow from the tab to the docked panel; fade content in.
+      panel.style.transformOrigin = "0 0";
+      panel.style.transition = "none";
+      panel.style.transform = `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})`;
+      if (inner) {
+        inner.style.transition = "none";
+        inner.style.opacity = "0";
+      }
+      void panel.getBoundingClientRect(); // force reflow
+      const raf = requestAnimationFrame(() => {
+        panel.style.transition = `transform ${FLIP_MS}ms cubic-bezier(0.2, 0.78, 0.18, 1)`;
+        panel.style.transform = "none";
+        if (inner) {
+          inner.style.transition = `opacity ${FLIP_MS}ms ease-in`;
+          inner.style.opacity = "1";
+        }
+      });
+      const cleanup = () => {
+        panel.style.transition = "";
+        panel.style.transform = "";
+        panel.style.transformOrigin = "";
+        if (inner) {
+          inner.style.transition = "";
+          inner.style.opacity = "";
+        }
+      };
+      const onEnd = (event: TransitionEvent) => {
+        if (event.propertyName === "transform") cleanup();
+      };
+      panel.addEventListener("transitionend", onEnd);
+      return () => {
+        cancelAnimationFrame(raf);
+        panel.removeEventListener("transitionend", onEnd);
+        cleanup();
+      };
+    }
+
+    // Pillar: the node clone is falling (rendered separately). Hold the panel as
+    // an invisible sliver, then after the fall unfold it upward at the bottom.
+    if (typeof panel.animate !== "function") return;
+    panel.style.transformOrigin = "50% 100%";
+    panel.style.transform = "scaleY(0.15)";
+    if (inner) inner.style.opacity = "0";
+
+    let anim: Animation | undefined;
+    let innerAnim: Animation | undefined;
+    const timer = setTimeout(() => {
+      // grows upward (origin 50% 100%, bottom edge anchored); content fades in
+      anim = panel.animate([{ transform: "scaleY(0.15)" }, { transform: "none" }], {
+        duration: EXPAND_MS,
+        easing: "cubic-bezier(0.2, 0.7, 0.2, 1)",
+        fill: "none",
+      });
+      panel.style.transform = ""; // the animation now drives transform → CSS docked on finish
+      innerAnim = inner?.animate([{ opacity: 0 }, { opacity: 1 }], {
+        duration: EXPAND_MS,
+        easing: "ease-out",
+        fill: "none",
+      });
+      if (inner) inner.style.opacity = "";
+      anim.onfinish = () => {
+        panel.style.transformOrigin = "";
+      };
+    }, FALL_MS);
+
+    return () => {
+      clearTimeout(timer);
+      anim?.cancel();
+      innerAnim?.cancel();
+      panel.style.transform = "";
+      panel.style.transformOrigin = "";
+      if (inner) inner.style.opacity = "";
+    };
+  }, [expandedId]);
 
   // Escape minimizes the expanded panel (non-modal — the orbit stays live).
   useEffect(() => {
@@ -382,7 +536,38 @@ export function Orbit({ nodes, pillarIds }: OrbitProps) {
                     aria-label={node.nodeLabel}
                     aria-expanded={expandedId === node.id}
                     aria-controls={`panel-${node.id}`}
-                    onClick={() => openPillar(node)}
+                    onClick={(event) => {
+                      const rect = event.currentTarget.getBoundingClientRect();
+                      lastTrigger.current = { rect, kind: "pillar" };
+                      // Animate only when it will actually run — never under
+                      // reduced-motion, zero rects (jsdom), or no WAAPI.
+                      const willAnimate =
+                        !prefersReducedMotion() &&
+                        rect.width > 0 &&
+                        rect.height > 0 &&
+                        typeof event.currentTarget.animate === "function";
+                      if (willAnimate) {
+                        const fall: FallingNode = {
+                          key: fallKey.current++,
+                          rect,
+                          number: node.number,
+                          label: node.nodeLabel,
+                          accent: node.accent,
+                        };
+                        setFallingNodes((list) => [...list, fall]);
+                        // The tab fades in only after the node has fallen away.
+                        const id = node.id;
+                        const timer = setTimeout(() => {
+                          setRevealedTabs((set) => new Set(set).add(id));
+                        }, TAB_DELAY_MS);
+                        revealTimers.current.push(timer);
+                      } else {
+                        // No fall: reveal the tab synchronously so jsdom stays in
+                        // sync (tests click, then assert the tab).
+                        setRevealedTabs((set) => new Set(set).add(node.id));
+                      }
+                      openPillar(node);
+                    }}
                   >
                     <span className="pillar-label">
                       <small>{node.number}</small>
@@ -433,11 +618,14 @@ export function Orbit({ nodes, pillarIds }: OrbitProps) {
         <p>Design · Development · Optimization</p>
       </footer>
 
-      {/* Bottom dock strip — client-only; one tab per opened pillar. */}
-      {mounted && docked.length > 0 ? (
+      {/* Bottom dock strip — client-only; a tab per opened pillar, revealed once
+          its node has fallen away. */}
+      {mounted && docked.some((d) => revealedTabs.has(d.id)) ? (
         <div className="dock-strip" role="group" aria-label="Open pillars">
-          {docked.map((entry) => {
-            const node = pillars.find((p) => p.id === entry.id);
+          {docked
+            .filter((entry) => revealedTabs.has(entry.id))
+            .map((entry) => {
+              const node = pillars.find((p) => p.id === entry.id);
             if (!node) return null;
             return (
               <button
@@ -450,11 +638,17 @@ export function Orbit({ nodes, pillarIds }: OrbitProps) {
                 ref={(el) => {
                   tabRefs.current.set(entry.id, el);
                 }}
-                onClick={() =>
-                  dockDispatch(
-                    entry.state === "expanded" ? { type: "MINIMIZE" } : { type: "EXPAND", id: entry.id },
-                  )
-                }
+                onClick={(event) => {
+                  if (entry.state === "expanded") {
+                    dockDispatch({ type: "MINIMIZE" });
+                  } else {
+                    lastTrigger.current = {
+                      rect: event.currentTarget.getBoundingClientRect(),
+                      kind: "tab",
+                    };
+                    dockDispatch({ type: "EXPAND", id: entry.id });
+                  }
+                }}
               >
                 {node.nodeLabel}
               </button>
@@ -462,6 +656,31 @@ export function Orbit({ nodes, pillarIds }: OrbitProps) {
           })}
         </div>
       ) : null}
+
+      {/* Falling node clones — each drops straight down and self-removes. */}
+      {fallingNodes.map((fall) => (
+        <div
+          key={fall.key}
+          className="falling-node"
+          aria-hidden="true"
+          style={
+            {
+              top: `${fall.rect.top}px`,
+              left: `${fall.rect.left}px`,
+              width: `${fall.rect.width}px`,
+              height: `${fall.rect.height}px`,
+              animationDuration: `${FALL_MS}ms`,
+              "--pillar-accent": fall.accent,
+            } as CSSProperties
+          }
+          onAnimationEnd={() => setFallingNodes((list) => list.filter((f) => f.key !== fall.key))}
+        >
+          <span className="pillar-label">
+            <small>{fall.number}</small>
+            {fall.label}
+          </span>
+        </div>
+      ))}
 
       {/*
         Pillar/center content panels. Base (no-JS) = static stacked readable blocks
