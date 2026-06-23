@@ -110,7 +110,7 @@ const centerNode: OrbitNode = {
   pairs: [
     {
       heading: "Run by Timothy Lum.",
-      body: "One person. Senior attention. Less noise.",
+      body: "A small team. Senior attention. Less noise.",
     },
     {
       heading: "Send the rough version.",
