@@ -15,6 +15,9 @@ export const metadata: Metadata = {
     siteName: siteConfig.brandName,
     type: "website",
   },
+  other: {
+    "build-stamp": process.env.NEXT_PUBLIC_BUILD_STAMP ?? "nostamp",
+  },
 };
 
 export default function RootLayout({

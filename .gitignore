@@ -28,3 +28,6 @@ tsconfig.tsbuildinfo
 
 # vercel
 .vercel
+
+# agent scratch — untracked files here would poison the build-stamp -dirty marker
+.claude/

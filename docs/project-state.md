@@ -5,6 +5,46 @@
 
 ---
 
+## 2026-08-17 — build stamp closes the cannot-prove-what-shipped gap
+
+oddbackward is the only project in this Developer tree whose deploy is manual
+(`npx vercel --prod`) with no git-triggered pipeline. Until today, nothing tied
+the live artifact back to a commit — a green test suite plus a screenshot was
+the entire proof. Branch `chore/build-stamp` adds the missing link.
+
+**What shipped** — built 2026-08-17, committed 2026-09-19 on branch
+`chore/build-stamp` (not yet deployed):
+
+- `next.config.ts` — computes a build stamp at build time (`git rev-parse
+  --short HEAD` + ISO timestamp, plus a `-dirty` suffix if the working tree is
+  not clean) and exposes it as `NEXT_PUBLIC_BUILD_STAMP`. The `-dirty` marker
+  is load-bearing: a stamp that reports a clean SHA while shipping uncommitted
+  code would be a gate that cannot fail, which is the defect class this exists
+  to close.
+- `src/app/layout.tsx` — renders `<meta name="build-stamp" content="…">` on
+  every exported page via the `metadata.other` field.
+- `scripts/verify-stamp.sh` — fetches the deployed page, extracts the meta
+  tag, and asserts (a) the SHA matches `git rev-parse --short HEAD` in this
+  clone, (b) the tag is present at all, (c) there is no `-dirty` marker,
+  and (d) the URL was actually reachable (unreachable is a hard fail, never a
+  skip). Modelled on `../el3vate-site/src/validate.js --selftest`: a
+  `--selftest` mode drives one must-pass fixture and three must-fail fixtures
+  (missing tag, mismatched SHA, dirty marker) through the same extraction path
+  and prints `RESULT: pass` only when every gate behaved correctly.
+- `docs/deploy.md` — makes the prebuilt sequence (`npx vercel build --prod`
+  then `npx vercel deploy --prebuilt --prod`, then `bash scripts/verify-stamp.sh`)
+  the single documented deploy path and calls out that a red result is a
+  rollback conversation, not a retry.
+
+**Operational caveat recorded here so it survives context resets:** the stamp
+is baked at Next build time from the local `.git`. If `npx vercel --prod`
+triggers a Vercel remote build that cannot see `.git`, the stamp will read
+`nogit …` and this gate will always fail. The safe deploy shape is prebuilt:
+`npx vercel build --prod && npx vercel deploy --prebuilt --prod` — the deploy
+runbook now documents this.
+
+---
+
 ## 2026-06-22 — v2 orbit reveal replaces v1, deployed to oddbackward.forpono.com
 
 The site's center-reveal mechanic was rebuilt on branch `orbit-reveal-v2` (now
