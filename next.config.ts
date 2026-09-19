@@ -2,6 +2,8 @@ import type { NextConfig } from "next";
 import { execSync } from "node:child_process";
 
 function buildStamp(): string {
+  const injected = process.env.BUILD_STAMP;
+  if (typeof injected === "string" && injected.length > 0) return injected;
   let sha = "nogit";
   let dirty = "";
   try {

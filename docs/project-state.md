@@ -3,6 +3,62 @@
 > Dated, newest-first log of what shipped and where things stand. Prepend new
 > entries at the top.
 
+## Destination
+
+`oddbackward.forpono.com` states what DDO is in one screen and shows every
+public project under Design, Development, Optimization with an honest status,
+crawlable without interaction, on a provably-current build.
+
+## Out of scope
+
+- **Prebuilt deploys.** `npx vercel build --prod` + `npx vercel deploy
+  --prebuilt --prod` break `/` routing for this static export on Vercel CLI 59
+  — the prebuilt `.vercel/output/config.json` has no route mapping `/` to
+  `/index`. See the 2026-09-19 incident below.
+
+---
+
+## 2026-09-19 — prebuilt deploy of `1afbf74` took prod down; ruled out; staged remote build is the new deploy path
+
+Incident opened and closed 2026-09-19.
+
+**What happened.** `npx vercel build --prod` + `npx vercel deploy --prebuilt
+--prod` of `1afbf74` took production down for a few minutes: `/` served the
+Next 404 page while `/index` returned 200. Rolled back to
+`dpl_GdsyrvMFRr8kWTPyAMyKPBkFYbst` — production is healthy and has no build
+stamp (the rolled-back deployment predates the stamp work).
+
+**Cause.** The prebuilt `.vercel/output/config.json` has no route mapping `/`
+to `/index` for this Next 15 static export on CLI 59. A remote build produces
+that mapping; a prebuilt push does not.
+
+**Controlled test.** Two previews of `1afbf74` with `vercel.json` present:
+prebuilt `/` returned 404, remote-built `/` returned 200. That's a
+one-variable difference, so prebuilt is ruled out for this project.
+
+**New deploy path (this slice, branch `chore/staged-deploy`, not yet
+deployed).** `bash scripts/deploy.sh` is the single deploy shape.
+
+- `next.config.ts` — `buildStamp()` now returns `process.env.BUILD_STAMP`
+  verbatim when it is a non-empty string, and falls back to the existing
+  git-derived stamp otherwise. This is the only reason a Vercel remote build
+  (which cannot see `.git`) can now produce a SHA-pinned artifact.
+- `scripts/deploy.sh` — staged remote build with `--skip-domain` and
+  `--build-env BUILD_STAMP="<sha> <iso>"`; three staged gates against the
+  resulting URL (root `/` = 200, `/no-such-page-xyz` = 404, root body contains
+  `<meta name="build-stamp">` whose content starts with the HEAD short SHA
+  followed by a space, with no `-dirty` and no `nogit`); on green,
+  `npx vercel promote` then `bash scripts/verify-stamp.sh` — the verify-stamp
+  exit code is the script's exit code. `--selftest` drives the same assertion
+  functions with offline fixtures (must-pass, root 404, root 302, missing-page
+  200, SHA mismatch, `-dirty`, `nogit`, missing meta tag).
+- `docs/deploy.md` — rewritten to make `bash scripts/deploy.sh` the single
+  path, record the rollback shape (`npx vercel rollback <url> --yes` — after
+  a rollback, production domains stop auto-assigning until a promote), and
+  state why prebuilt is forbidden.
+
+Status: **not yet deployed** — infra-only slice.
+
 ---
 
 ## 2026-09-19 — first deploy attempt of `2af38fa` refused by stamp gate
@@ -25,8 +81,21 @@ correctly refused — the deployed artifact could not be pinned to a clean SHA.
 Not yet deployed: this slice is infra-only. Redeploy happens in a later slice
 once the tree is clean and the stamp is expected to come up green.
 
+**Update 2026-09-19 (later, same day):** the "safe deploy shape" assumed by
+this entry (prebuilt) was ruled out later the same day — see the newer
+2026-09-19 incident entry above. The `npm ci` pin still stands (a clean tree is
+still a precondition of a clean stamp), but the deploy that follows it is now
+`bash scripts/deploy.sh` (staged remote build), not prebuilt.
+
 ## Open questions
 
+- **2026-09-19 — `research`: `npm ci` reports 8 vulnerabilities (1 critical).**
+  The advisory line lands on every install and none of it has been triaged. Run
+  `npm audit --omit=dev` to see whether any of the flagged packages actually
+  reach the shipped static-export artifact — dev-only vulnerabilities in
+  vitest/postcss tooling are a different risk class than a runtime dependency
+  bundled into `out/`. Decide-then-act; do not silence the warning without
+  triage.
 - **2026-09-19 — Volta precedes nvm in non-interactive shells.** The agent
   shell started with Volta's Node 20.14.0 on `PATH` even after `nvm use` picked
   v22.23.2, so `node -v` still reported v20 and `npm test` hit
@@ -76,6 +145,15 @@ triggers a Vercel remote build that cannot see `.git`, the stamp will read
 `nogit …` and this gate will always fail. The safe deploy shape is prebuilt:
 `npx vercel build --prod && npx vercel deploy --prebuilt --prod` — the deploy
 runbook now documents this.
+
+**Update 2026-09-19:** the "safe deploy shape is prebuilt" claim above was
+falsified on 2026-09-19 — a prebuilt deploy of `1afbf74` served the Next 404
+page at `/` in production. See the 2026-09-19 incident entry above. The
+build-stamp mechanism shipped in this slice still stands, but with an
+addition: `next.config.ts` now honors `process.env.BUILD_STAMP` verbatim when
+set, so the staged remote build in `scripts/deploy.sh` can inject a
+SHA-pinned stamp without needing `.git` on the builder. `scripts/verify-stamp.sh`
+is unchanged and is called at the end of the new deploy path.
 
 ---
 
