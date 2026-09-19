@@ -5,6 +5,40 @@
 
 ---
 
+## 2026-09-19 — first deploy attempt of `2af38fa` refused by stamp gate
+
+The first prebuilt deploy attempt of the `chore/build-stamp` work (HEAD
+`2af38fa`) was refused by the build-stamp gate. Root cause: `npx vercel build
+--prod` runs `npm install`, which rewrote `package-lock.json` (90 deleted lines,
+all `"libc"` platform hints under `dependencies`); the working tree was no
+longer clean, so `next.config.ts` appended `-dirty` to the stamp. The gate
+correctly refused — the deployed artifact could not be pinned to a clean SHA.
+
+**Fix (this slice, branch `chore/npm-ci-install`, not yet deployed):**
+
+- `vercel.json` — `{"installCommand": "npm ci"}`. `npm ci` installs strictly
+  from the lockfile and does not mutate it.
+- `package-lock.json` — normalized (regenerated `libc` blocks removed) so the
+  lockfile matches what `npm ci` will produce and the working tree stays clean.
+- `docs/deploy.md` — new "Install" section documents the pin.
+
+Not yet deployed: this slice is infra-only. Redeploy happens in a later slice
+once the tree is clean and the stamp is expected to come up green.
+
+## Open questions
+
+- **2026-09-19 — Volta precedes nvm in non-interactive shells.** The agent
+  shell started with Volta's Node 20.14.0 on `PATH` even after `nvm use` picked
+  v22.23.2, so `node -v` still reported v20 and `npm test` hit
+  `ERR_REQUIRE_ESM` from vitest until PATH was manually reordered. This is a
+  machine-wide PATH-source ordering issue (Volta shims live at
+  `/Users/timothylum/.volta/tools/image/node/20.14.0/bin` and appear before
+  `/Users/timothylum/.nvm/versions/node/v22.23.2/bin`). Fix in a separate
+  slice — decide whether to demote Volta, uninstall Volta's Node, or add a
+  shell wrapper that sources nvm before Volta.
+
+---
+
 ## 2026-08-17 — build stamp closes the cannot-prove-what-shipped gap
 
 oddbackward is the only project in this Developer tree whose deploy is manual

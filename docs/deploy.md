@@ -24,6 +24,15 @@ Next.js 15 **static export** — `next.config.ts` sets `output: "export"` and
 `images.unoptimized`. `next build` writes static assets to `out/`; the deploy
 publishes those static assets (no server runtime).
 
+## Install
+
+The install phase is pinned to `npm ci` via `vercel.json` (`installCommand`).
+`npm install` rewrites `package-lock.json` (dropping `"libc"` platform hints
+under `dependencies`), which dirties the working tree during
+`npx vercel build --prod` and trips the `-dirty` build stamp — the deploy gate
+then correctly refuses. `npm ci` installs strictly from the lockfile and does
+not mutate it.
+
 ## Deploy steps
 
 1. **On `main`, clean tree, full gate green:**
