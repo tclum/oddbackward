@@ -110,7 +110,7 @@ const centerNode: OrbitNode = {
   pairs: [
     {
       heading: "Run by Timothy Lum.",
-      body: "A small team. Senior attention. Less noise.",
+      body: "One person. Senior attention. Less noise.",
     },
     {
       heading: "Send the rough version.",
@@ -136,8 +136,8 @@ const pillarNodes: OrbitNode[] = pillars.map((pillar, index) => ({
   proofs: pillar.proofs.map((proof) => ({
     name: proof.name,
     summary: proof.summary,
-    href: proof.urlKey ? siteConfig.urls[proof.urlKey] : undefined,
-    ariaLabel: proof.urlKey ? `${proof.name} website` : undefined,
+    href: proof.href,
+    ariaLabel: proof.href ? `${proof.name} website` : undefined,
   })),
   work: selectedWork
     .filter((item) => item.pillar === pillar.pillar)
@@ -145,8 +145,8 @@ const pillarNodes: OrbitNode[] = pillars.map((pillar, index) => ({
       title: item.title,
       summary: item.summary,
       detail: item.detail,
-      href: item.urlKey ? siteConfig.urls[item.urlKey] : undefined,
-      ariaLabel: item.urlKey ? `${item.title} website` : undefined,
+      href: item.href,
+      ariaLabel: item.href ? `${item.title} website` : undefined,
     })),
   links: [],
   pairs: [],

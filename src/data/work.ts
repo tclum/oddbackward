@@ -1,11 +1,11 @@
-import type { SiteUrlKey } from "@/config/site";
+import { projects } from "@/data/projects";
 
 export type Pillar = "Design" | "Development" | "Optimization";
 
 export type Proof = {
   name: string;
   summary: string;
-  urlKey?: SiteUrlKey;
+  href?: string;
 };
 
 export type PillarBlock = {
@@ -19,81 +19,35 @@ export type WorkItem = {
   pillar: Pillar;
   summary: string;
   detail: string;
-  urlKey?: SiteUrlKey;
+  href?: string;
 };
 
-export const pillars: PillarBlock[] = [
-  {
-    pillar: "Design",
-    statement: "Sites that fit the business.",
-    proofs: [
-      {
-        name: "Forpono",
-        summary: "A website starting point for small teams.",
-        urlKey: "forpono",
-      },
-      {
-        name: "Select work",
-        summary: "Reserved for the next approved case study.",
-      },
-    ],
-  },
-  {
-    pillar: "Development",
-    statement: "Apps, dashboards, and tools for the real workflow.",
-    proofs: [
-      {
-        name: "Risk Analytics",
-        summary: "Analytics for public safety risk data.",
-        urlKey: "riskAnalytics",
-      },
-      {
-        name: "bus-finance",
-        summary: "Finance planning for everyday decisions.",
-      },
-    ],
-  },
-  {
-    pillar: "Optimization",
-    statement: "Routine work, made lighter or automatic.",
-    proofs: [
-      {
-        name: "Flyer Bot",
-        summary: "One input. Flyer, post, email.",
-      },
-      {
-        name: "Interactive information avatar",
-        summary: "A voice guide for questions and answers.",
-      },
-    ],
-  },
-];
+const PILLAR_STATEMENTS: Record<Pillar, string> = {
+  Design: "Sites that fit the business.",
+  Development: "Apps, dashboards, and tools for the real workflow.",
+  Optimization: "Routine work, made lighter or automatic.",
+};
 
-export const selectedWork: WorkItem[] = [
-  {
-    title: "Forpono",
-    pillar: "Design",
-    summary: "Website launch point for small teams.",
-    detail: "Positioning, structure, and a usable web presence.",
-    urlKey: "forpono",
-  },
-  {
-    title: "Risk Analytics",
-    pillar: "Development",
-    summary: "Decision tools for public datasets.",
-    detail: "Risk signals in one place, without extra data work.",
-    urlKey: "riskAnalytics",
-  },
-  {
-    title: "Flyer Bot",
-    pillar: "Optimization",
-    summary: "Promotion from one clean input.",
-    detail: "Flyer, social post, and email from the same source.",
-  },
-  {
-    title: "Interactive information avatar",
-    pillar: "Optimization",
-    summary: "A voice guide for questions and next steps.",
-    detail: "Scattered knowledge in an ask-and-answer flow.",
-  },
-];
+const PILLAR_ORDER: Pillar[] = ["Design", "Development", "Optimization"];
+
+export const pillars: PillarBlock[] = PILLAR_ORDER.map((pillar) => ({
+  pillar,
+  statement: PILLAR_STATEMENTS[pillar],
+  proofs: projects
+    .filter((project) => project.pillar === pillar)
+    .map((project) => ({
+      name: project.name,
+      summary: project.summary,
+      href: project.href,
+    })),
+}));
+
+export const selectedWork: WorkItem[] = projects
+  .filter((project) => project.featured)
+  .map((project) => ({
+    title: project.name,
+    pillar: project.pillar,
+    summary: project.summary,
+    detail: project.detail,
+    href: project.href,
+  }));

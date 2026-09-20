@@ -7,6 +7,7 @@ export const metadata: Metadata = {
   title: `${siteConfig.brandName} | Design. Development. Optimization.`,
   description:
     "Custom websites, apps, and workflow improvements for small businesses and teams.",
+  alternates: { canonical: "/" },
   openGraph: {
     title: `${siteConfig.brandName} | Design. Development. Optimization.`,
     description:

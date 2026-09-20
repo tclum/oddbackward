@@ -9,6 +9,7 @@ import { metadata } from "@/app/layout";
 import { siteConfig } from "@/config/site";
 import { orbitNodes, pillarIds } from "@/data/orbit";
 import { portfolios, resolvePortfolio } from "@/data/portfolio";
+import { projects } from "@/data/projects";
 import { pillars, selectedWork } from "@/data/work";
 
 const pillarNodes = orbitNodes.filter((n) => n.kind === "pillar");
@@ -212,7 +213,9 @@ describe("DDO Hawaii Orbit", () => {
       const panel = panelEl(node.id);
       for (const item of work) {
         expect(within(panel).getAllByText(item.title).length).toBeGreaterThan(0);
-        expect(within(panel).getByText(item.summary)).toBeInTheDocument();
+        // Featured items appear as both a proof and a selected-work entry in the
+        // same panel, so their (shared) summary is present in more than one node.
+        expect(within(panel).getAllByText(item.summary).length).toBeGreaterThan(0);
       }
     }
   });
@@ -281,7 +284,10 @@ describe("DDO Hawaii Orbit", () => {
   it("uses configured destinations for every external and contact link", () => {
     renderHome();
 
-    const configuredUrls = Object.values(siteConfig.urls);
+    const projectHrefs = projects
+      .map((project) => project.href)
+      .filter((href): href is string => typeof href === "string");
+    const allowedHrefs = new Set<string>([...Object.values(siteConfig.urls), ...projectHrefs]);
     const links = screen.getAllByRole("link", { hidden: true });
     const externalHrefs = links
       .map((link) => link.getAttribute("href"))
@@ -289,12 +295,11 @@ describe("DDO Hawaii Orbit", () => {
 
     expect(externalHrefs.length).toBeGreaterThan(0);
     for (const href of externalHrefs) {
-      expect(configuredUrls).toContain(href);
+      expect(allowedHrefs.has(href)).toBe(true);
     }
 
     expect(externalHrefs).toContain(siteConfig.urls.forpono);
     expect(externalHrefs).toContain(siteConfig.urls.founder);
-    expect(externalHrefs).toContain(siteConfig.urls.riskAnalytics);
     expect(
       links.some((link) => link.getAttribute("href") === `mailto:${siteConfig.contactEmail}`),
     ).toBe(true);
@@ -306,9 +311,10 @@ describe("DDO Hawaii Orbit", () => {
     expect(siteConfig.legalName).not.toMatch(/\bLLC\b/i);
     expect(siteConfig.contactEmail).toBe("tclum@forpono.com");
     expect(siteConfig.contactEmail).not.toBe("timothy@forpono.com");
+    expect(siteConfig.domain).toBe("oddbackward.forpono.com");
+    expect(siteConfig.urls.home).toBe("https://oddbackward.forpono.com");
     expect(siteConfig.urls.forpono).toBe("https://forpono.com");
     expect(siteConfig.urls.founder).toBe("https://tclum.forpono.com");
-    expect(siteConfig.urls.riskAnalytics).toBe("https://risk.forpono.com");
 
     const proofEntries = pillars.flatMap((pillar) =>
       pillar.proofs.map((proof) => `${pillar.pillar}:${proof.name}`),
@@ -318,15 +324,15 @@ describe("DDO Hawaii Orbit", () => {
       expect.arrayContaining([
         "Design:Forpono",
         "Development:Risk Analytics",
-        "Development:bus-finance",
+        "Development:Hawaiʻi BEAD Explorer",
+        "Optimization:Workflow Intel",
         "Optimization:Flyer Bot",
-        "Optimization:Interactive information avatar",
+        "Optimization:PACE Bot",
       ]),
     );
 
     for (const pillar of pillars) {
       expect(pillar.proofs.length).toBeGreaterThanOrEqual(1);
-      expect(pillar.proofs.length).toBeLessThanOrEqual(3);
     }
   });
 
@@ -337,9 +343,13 @@ describe("DDO Hawaii Orbit", () => {
       "src/components/Orbit.tsx",
     ];
 
+    const projectHrefs = projects
+      .map((project) => project.href)
+      .filter((href): href is string => typeof href === "string");
     const forbiddenValues = [
       siteConfig.contactEmail,
       ...Object.values(siteConfig.urls).filter((url) => url !== siteConfig.urls.home),
+      ...projectHrefs,
     ];
 
     for (const file of filesToCheck) {
