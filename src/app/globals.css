@@ -813,6 +813,124 @@ button.orbit-core:not([aria-disabled="true"]):hover {
   color: rgb(var(--color-ink));
 }
 
+/* work index */
+
+/*
+  Static ledger under the orbit (layout A). Sits in normal flow after the
+  footer; z-index 1 lifts it above the fixed grid/grain washes on body.
+  Pillar accents reuse the existing brass / sage / clay tokens.
+*/
+.work-index {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 1120px);
+  margin: 0 auto;
+  padding: 48px max(16px, clamp(18px, 4vw, 40px)) 96px;
+}
+
+.work-col[data-pillar="Design"] {
+  --work-accent: var(--color-brass);
+}
+
+.work-col[data-pillar="Development"] {
+  --work-accent: var(--color-sage);
+}
+
+.work-col[data-pillar="Optimization"] {
+  --work-accent: var(--color-clay);
+}
+
+.work-title {
+  margin: 0 0 24px;
+  font-family: var(--font-display);
+  font-size: clamp(28px, 4vw, 40px);
+  font-weight: 400;
+}
+
+.work-cols {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 28px;
+}
+
+.work-pillar {
+  margin: 0 0 4px;
+  color: rgb(var(--work-accent));
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 400;
+}
+
+.work-stmt {
+  min-height: 34px;
+  margin: 0 0 14px;
+  color: rgb(var(--color-ink) / 0.6);
+  font-size: 13px;
+}
+
+.work-row {
+  display: block;
+  padding: 14px 0;
+  border-top: 1px solid rgb(var(--color-ink) / 0.13);
+  color: inherit;
+  text-decoration: none;
+}
+
+.work-row-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.work-name {
+  min-width: 0;
+  font-size: 16px;
+  overflow-wrap: anywhere;
+}
+
+.work-summary {
+  display: block;
+  margin: 5px 0 0;
+  color: rgb(var(--color-ink) / 0.66);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.work-tag {
+  display: inline-block;
+  padding: 3px 8px;
+  border: 1px solid rgb(var(--color-ink) / 0.22);
+  border-radius: 999px;
+  color: rgb(var(--color-ink) / 0.7);
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.work-tag.is-live {
+  border-color: rgb(var(--work-accent) / 0.7);
+  color: rgb(var(--work-accent));
+}
+
+a.work-row .work-name::after {
+  content: " \2197" / "";
+  color: rgb(var(--work-accent));
+  font-size: 13px;
+}
+
+a.work-row:hover .work-name,
+a.work-row:focus-visible .work-name {
+  color: rgb(var(--work-accent));
+}
+
+@media (max-width: 820px) {
+  .work-cols {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .sr-only {
   position: absolute;
   width: 1px;

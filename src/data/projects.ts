@@ -63,9 +63,10 @@ export const projects: Project[] = [
     slug: "kailani",
     name: "Kailani",
     pillar: "Design",
-    status: "in-progress",
+    status: "live",
     summary: "A fashion marketplace.",
-    detail: "Web app up. API in progress.",
+    detail: "Interactive storefront demo. No real orders.",
+    href: "https://kailani.forpono.com",
   },
 
   // Development
@@ -92,10 +93,9 @@ export const projects: Project[] = [
     slug: "air-hub",
     name: "AIR Hub",
     pillar: "Development",
-    status: "live",
+    status: "in-progress",
     summary: "The hub for a student builder bootcamp.",
-    detail: "Cohorts, a live session queue, tutorials, a project registry.",
-    href: "https://air.forpono.com",
+    detail: "Being rebuilt. Cohorts, a live session queue, tutorials, a project registry.",
   },
   {
     slug: "desktop-pet",

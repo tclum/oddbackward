@@ -16,9 +16,38 @@ crawlable without interaction, on a provably-current build.
 
 ---
 
+## 2026-09-27 — slice 2: static work index (layout A, ledger) under the orbit
+
+Status: **committed, not deployed** — branch `feat/work-index`.
+
+- `src/components/WorkIndex.tsx` — new server component. `<section id="work">`
+  renders every registry project under its pillar in three columns (Design,
+  Development, Optimization), each row carrying name, status tag, and summary.
+  Only `live` projects render as links (new tab, `noopener noreferrer`); every
+  other row is plain text. The whole list is in the static export, so it is
+  crawlable without interaction.
+- `src/data/work.ts` — `Proof` now carries `status`; `STATUS_LABEL` is the one
+  map from `ProjectStatus` to visible copy (Live, In progress, Demo soon, Past).
+- `src/app/page.tsx` — renders `<WorkIndex />` after `<Orbit />` in `<main>`.
+  It lands below the orbit footer in normal flow; no Orbit layout change.
+- `src/app/globals.css` — new `/* work index */` block, ported from the Option
+  A ledger prototype onto existing tokens (brass / sage / clay, display font).
+  One column at `max-width: 820px`.
+- Registry: **Kailani** is `live` at `https://kailani.forpono.com` ("Interactive
+  storefront demo. No real orders."). **AIR Hub** moves to `in-progress` with
+  its href removed ("Being rebuilt. …"): on 2026-09-27 `https://air.forpono.com`
+  served the default Next.js starter page, so a live link was a false claim.
+- Layout decision: option A (ledger columns), chosen by Tim 2026-09-27 over B
+  (cards) and C (spec sheet).
+- Tests: `src/components/WorkIndex.test.tsx` (every project once, anchors only
+  for live projects with registry hrefs, status labels from `STATUS_LABEL`, no
+  `"use client"` or hardcoded names/URLs in the component). The brand test now
+  asserts the index rendered before scanning body text.
+
 ## 2026-09-19 — slice 1: single project registry, solo voice, canonical to `oddbackward.forpono.com`
 
-Status: **committed, not deployed** — branch `feat/project-registry`.
+Status: **deployed** — live build stamp `42188bc 2026-09-20T00:25:42Z`, on
+`main`.
 
 - `src/data/projects.ts` — new single source of project facts (slug, name,
   pillar, status, summary, detail, href, featured). `ProjectStatus` is
@@ -75,21 +104,16 @@ pillar-panel system, ODD↔DDO glyph morph, held-until-dismissed finale, and a
 - **2026-09-19 — `research`: `npm audit --omit=dev`.** `npm ci` reports 8
   vulnerabilities (1 critical); none triaged. Check whether any reach the
   shipped static-export artifact, or whether they are dev-only tooling.
-- **2026-09-19 — `prototype`: static work index under the orbit.** Slice 2
-  reserved for the crawlable project list — layout, ordering, and status
-  chips. Do not implement in this slice.
+- **2026-09-27 — `task`: air.forpono.com serves the Next.js starter page;
+  AIR Hub stays in-progress until the hub is redeployed.**
 - **2026-09-19 — `task`: record demo clips for PACE Bot and Desktop Pet.** The
   Optimization pillar has no live proof until then; the Development pillar has
   Desktop Pet at `recording` waiting for the same.
-- **2026-09-19 — `research`: has the Kailani API shipped since 2026-09-11?**
-  If yes, flip its status to `live` and add its href.
 - **2026-09-19 — `grilling`: remove the Workflow Intel password gate.** Public
   exposure needs its own recon in the `workflow-intel-web` repo; not a
   drive-by from here.
 
 ## Accepted gaps
 
-- `air.forpono.com` ships the title "Create Next App". Fix lives in the
-  `air-hub` repo, not this one.
 - Featured projects show their summary twice in an orbit panel (once as a
   proof, once as a selected-work entry). Slice 2 restructures the panels.

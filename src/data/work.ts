@@ -1,10 +1,11 @@
-import { projects } from "@/data/projects";
+import { projects, type ProjectStatus } from "@/data/projects";
 
 export type Pillar = "Design" | "Development" | "Optimization";
 
 export type Proof = {
   name: string;
   summary: string;
+  status: ProjectStatus;
   href?: string;
 };
 
@@ -28,6 +29,14 @@ const PILLAR_STATEMENTS: Record<Pillar, string> = {
   Optimization: "Routine work, made lighter or automatic.",
 };
 
+// The only place a status becomes visible copy; the work index reads labels here.
+export const STATUS_LABEL: Record<ProjectStatus, string> = {
+  live: "Live",
+  "in-progress": "In progress",
+  recording: "Demo soon",
+  past: "Past",
+};
+
 const PILLAR_ORDER: Pillar[] = ["Design", "Development", "Optimization"];
 
 export const pillars: PillarBlock[] = PILLAR_ORDER.map((pillar) => ({
@@ -38,6 +47,7 @@ export const pillars: PillarBlock[] = PILLAR_ORDER.map((pillar) => ({
     .map((project) => ({
       name: project.name,
       summary: project.summary,
+      status: project.status,
       href: project.href,
     })),
 }));

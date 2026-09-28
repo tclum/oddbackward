@@ -392,6 +392,9 @@ describe("DDO Hawaii Orbit", () => {
   it("does not use registered-entity wording or foreground the two-letter acronym", () => {
     renderHome();
 
+    // The scan below reads the whole body, so it covers the work index too;
+    // assert the index actually rendered so that coverage cannot silently lapse.
+    expect(document.getElementById("work")).not.toBeNull();
     const visibleText = document.body.textContent ?? "";
     const metadataText = [metadata.title, metadata.description].join(" ");
     const combinedCustomerText = `${visibleText} ${metadataText}`;
