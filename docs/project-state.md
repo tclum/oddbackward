@@ -115,5 +115,5 @@ pillar-panel system, ODD↔DDO glyph morph, held-until-dismissed finale, and a
 
 ## Accepted gaps
 
-- Featured projects show their summary twice in an orbit panel (once as a
-  proof, once as a selected-work entry). Slice 2 restructures the panels.
+- Featured projects show their summary twice in an orbit panel. Panel
+  restructure is unscheduled.
