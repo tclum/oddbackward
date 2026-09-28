@@ -16,9 +16,31 @@ crawlable without interaction, on a provably-current build.
 
 ---
 
+## 2026-09-28 — dependency hygiene: next 15.5.26, postcss override raised
+
+Status: **committed, not deployed** — branch `chore/deps-audit`.
+
+- `package.json`: `next` 15.5.19 → 15.5.26 (exact pin, patched 15.5 release).
+  `overrides.postcss` and `devDependencies.postcss` `^8.5.15` → `^8.5.23`.
+- In-range updates only (`npm update postcss nanoid sharp`, no `--force`, no
+  major bump): postcss 8.5.15 → 8.5.28, nanoid 3.3.12 → 3.3.19, sharp 0.34.5 →
+  0.35.5 (next 15.5.26 declares `sharp: ^0.34.3 || ^0.35.4`).
+- `npm audit fix` was not used: npm 10.2.4 crashes in arborist
+  (`Cannot read properties of null (reading 'edgesOut')`) while resolving the
+  vitest peer set. Raising the override plus `npm update` reached the same
+  in-range fixes without it.
+- `npm audit --omit=dev`: 4 (1 critical, 3 high) → **0**. Full `npm audit`:
+  8 (1 critical, 4 high, 3 moderate) → 4 (1 high, 3 moderate).
+- Reach: none of the fixed advisories reached the shipped artifact.
+  `output: "export"` with `images.unoptimized: true`, no server actions or API
+  routes; live `/_next/image?...` and `/api/x` return 404.
+- Accepted dev-only residuals (not reachable: test and build tooling only):
+  `@vitest/mocker` / `vitest` (moderate), `baseline-browser-mapping`
+  (moderate), `browserslist` (high).
+
 ## 2026-09-27 — slice 2: static work index (layout A, ledger) under the orbit
 
-Status: **committed, not deployed** — branch `feat/work-index`.
+Status: **deployed** — live build stamp `a80d456 2026-09-28T08:20:14Z`, on `main`.
 
 - `src/components/WorkIndex.tsx` — new server component. `<section id="work">`
   renders every registry project under its pillar in three columns (Design,
@@ -101,9 +123,6 @@ pillar-panel system, ODD↔DDO glyph morph, held-until-dismissed finale, and a
   picks v22.23.2, so `node -v` reports v20 and `npm test` hits
   `ERR_REQUIRE_ESM` from vitest until PATH is reordered. Machine-wide PATH
   ordering issue. Fix in a separate slice.
-- **2026-09-19 — `research`: `npm audit --omit=dev`.** `npm ci` reports 8
-  vulnerabilities (1 critical); none triaged. Check whether any reach the
-  shipped static-export artifact, or whether they are dev-only tooling.
 - **2026-09-27 — `task`: air.forpono.com serves the Next.js starter page;
   AIR Hub stays in-progress until the hub is redeployed.**
 - **2026-09-19 — `task`: record demo clips for PACE Bot and Desktop Pet.** The
