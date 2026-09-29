@@ -111,9 +111,10 @@ export const projects: Project[] = [
     slug: "workflow-intel",
     name: "Workflow Intel",
     pillar: "Optimization",
-    status: "in-progress",
+    status: "live",
     summary: "A pipeline that reads the field, scores what matters, and writes the weekly brief.",
-    detail: "Private for now.",
+    detail: "Eleven sources, weekly triage, one strategy doc. Runs unattended every Sunday.",
+    href: "https://intel.forpono.com",
   },
   {
     slug: "flyer-bot",

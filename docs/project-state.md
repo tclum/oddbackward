@@ -16,9 +16,24 @@ crawlable without interaction, on a provably-current build.
 
 ---
 
+## 2026-09-28 — Workflow Intel live; Optimization now has a clickable project
+
+Status: **committed, not deployed** — branch `feat/intel-live`.
+
+- `https://intel.forpono.com` went public on 2026-09-28: read pages are open,
+  `/settings` is gated. Checked 2026-09-28: `/` and `/strategy` return 200,
+  `/settings` returns 307 to `/login?next=%2Fsettings`.
+- `src/data/projects.ts`: the `workflow-intel` entry moves from `in-progress`
+  to `live` with `href: "https://intel.forpono.com"` and detail "Eleven
+  sources, weekly triage, one strategy doc. Runs unattended every Sunday."
+  Summary unchanged. No other registry entry changes.
+- The work index renders it as a link with no component change, because links
+  are derived from `status === "live"` plus the registry `href`. Optimization
+  now has a clickable project; Flyer Bot and PACE Bot stay unlinked.
+
 ## 2026-09-28 — dependency hygiene: next 15.5.26, postcss override raised
 
-Status: **committed, not deployed** — branch `chore/deps-audit`.
+Status: **deployed** — live build stamp `b3dcf91 2026-09-29T00:01:23Z`, on `main`.
 
 - `package.json`: `next` 15.5.19 → 15.5.26 (exact pin, patched 15.5 release).
   `overrides.postcss` and `devDependencies.postcss` `^8.5.15` → `^8.5.23`.
@@ -126,11 +141,7 @@ pillar-panel system, ODD↔DDO glyph morph, held-until-dismissed finale, and a
 - **2026-09-27 — `task`: air.forpono.com serves the Next.js starter page;
   AIR Hub stays in-progress until the hub is redeployed.**
 - **2026-09-19 — `task`: record demo clips for PACE Bot and Desktop Pet.** The
-  Optimization pillar has no live proof until then; the Development pillar has
-  Desktop Pet at `recording` waiting for the same.
-- **2026-09-19 — `grilling`: remove the Workflow Intel password gate.** Public
-  exposure needs its own recon in the `workflow-intel-web` repo; not a
-  drive-by from here.
+  Development pillar has Desktop Pet at `recording` waiting for the same.
 
 ## Accepted gaps
 
