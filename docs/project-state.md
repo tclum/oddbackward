@@ -16,9 +16,31 @@ crawlable without interaction, on a provably-current build.
 
 ---
 
+## 2026-11-16 — registry truth: Risk Analytics past, Chef Chai in progress, founder link to /about
+
+Status: **committed, not deployed** — branch `fix/site-truth`.
+
+- Checked from outside on 2026-11-16 (HST): `https://risk.forpono.com` answers
+  404, yet the registry marked Risk Analytics `live` with that `href`, so the
+  work index and the Development panel showed a dead link under a Live tag.
+- Checked 2026-11-16: `https://chef-chai.forpono.com` is a staged, noindex,
+  pre-launch customer build (its own detail reads "Pre-launch build."). It was
+  `live` only because the registry allows a link on `live` alone. The launch is
+  on hold by Tim's decision, so the public link comes off until it launches.
+- Checked 2026-11-16: "About the founder" opened `https://tclum.forpono.com`,
+  which redirects to `/media`, a gallery of placeholder stock photos.
+  `https://tclum.forpono.com/about` answers 200 with Tim's bio.
+- `src/data/projects.ts`: `risk-analytics` moves to `past` and `chef-chai` to
+  `in-progress`, both with `href` removed. Name, summary, detail and pillar
+  unchanged; no other entry changes.
+- `src/config/site.ts`: `urls.founder` is now
+  `https://tclum.forpono.com/about` (the `page.test.tsx` config assertion
+  follows).
+- The link-check gate arrives two commits later on this branch.
+
 ## 2026-09-28 — Workflow Intel live; Optimization now has a clickable project
 
-Status: **committed, not deployed** — branch `feat/intel-live`.
+Status: **deployed** — live build stamp `c76b8a8 2026-09-29T03:13:57Z`, on `main`.
 
 - `https://intel.forpono.com` went public on 2026-09-28: read pages are open,
   `/settings` is gated. Checked 2026-09-28: `/` and `/strategy` return 200,

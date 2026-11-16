@@ -45,10 +45,9 @@ export const projects: Project[] = [
     slug: "chef-chai",
     name: "Chef Chai",
     pillar: "Design",
-    status: "live",
+    status: "in-progress",
     summary: "A restaurant site on Forpono.",
     detail: "Pre-launch build.",
-    href: "https://chef-chai.forpono.com",
   },
   {
     slug: "el3vate",
@@ -84,10 +83,9 @@ export const projects: Project[] = [
     slug: "risk-analytics",
     name: "Risk Analytics",
     pillar: "Development",
-    status: "live",
+    status: "past",
     summary: "Analytics for public safety risk data.",
     detail: "Risk signals in one place, without extra data work.",
-    href: "https://risk.forpono.com",
   },
   {
     slug: "air-hub",

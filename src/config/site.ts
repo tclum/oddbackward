@@ -7,7 +7,7 @@ export const siteConfig = {
   urls: {
     home: "https://oddbackward.forpono.com",
     forpono: "https://forpono.com",
-    founder: "https://tclum.forpono.com",
+    founder: "https://tclum.forpono.com/about",
   },
 } as const;
 

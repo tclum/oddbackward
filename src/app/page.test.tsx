@@ -314,7 +314,7 @@ describe("DDO Hawaii Orbit", () => {
     expect(siteConfig.domain).toBe("oddbackward.forpono.com");
     expect(siteConfig.urls.home).toBe("https://oddbackward.forpono.com");
     expect(siteConfig.urls.forpono).toBe("https://forpono.com");
-    expect(siteConfig.urls.founder).toBe("https://tclum.forpono.com");
+    expect(siteConfig.urls.founder).toBe("https://tclum.forpono.com/about");
 
     const proofEntries = pillars.flatMap((pillar) =>
       pillar.proofs.map((proof) => `${pillar.pillar}:${proof.name}`),
