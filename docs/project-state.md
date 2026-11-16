@@ -16,6 +16,26 @@ crawlable without interaction, on a provably-current build.
 
 ---
 
+## 2026-11-16 — link-check gate: the deploy refuses a staged page with a dead outbound link
+
+Status: **committed, not deployed** — branch `fix/site-truth`.
+
+- `https://risk.forpono.com` answered 404 under a Live tag in production until
+  an outside audit noticed on 2026-11-13; no gate looked at the links the page
+  ships. Write-up: [`docs/findings-deploy.md`](./findings-deploy.md)
+  (2026-11-16 entry).
+- `scripts/check-links.sh` v1 (new): every distinct http(s) `href` inside an
+  `<a>` tag must answer exactly 200 after redirects (GET, 15s cap, up to two
+  attempts). `<link>` and `mailto:` are outside the set; an empty set is a
+  fail. Modes: `<page-url>`, `--stdin`, `--selftest` (11 offline fixtures
+  through the same extractor, verdict and loop, with stub fetchers).
+- `scripts/deploy.sh` v2: preflight refuses unless the check-links selftest
+  is green; staged gate 4 pipes the staged root body through
+  `check-links.sh --stdin` and refuses promotion on any failed link.
+- `docs/deploy.md`: gate 4, the selftest line, and a "Link check" section with
+  the standalone command and what the gate cannot see (a 200 with the wrong
+  content passes).
+
 ## 2026-11-16 — contact line below the work index, visible without the reveal
 
 Status: **committed, not deployed** — branch `fix/site-truth`.
@@ -179,6 +199,11 @@ pillar-panel system, ODD↔DDO glyph morph, held-until-dismissed finale, and a
 
 ## Open questions
 
+- **2026-11-16 — `grilling`: run `check-links.sh` against production on a
+  schedule.** A GitHub Actions cron running
+  `bash scripts/check-links.sh https://oddbackward.forpono.com` would turn a
+  link that dies between deploys red. Recommended after the domain move; not
+  built.
 - **2026-09-19 — `task`: Volta precedes nvm in non-interactive shells.** The
   agent shell starts with Volta's Node 20.14.0 on `PATH` even after `nvm use`
   picks v22.23.2, so `node -v` reports v20 and `npm test` hits

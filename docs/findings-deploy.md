@@ -3,6 +3,36 @@
 > Hard-won findings about deploying oddbackward. Referenced from
 > `docs/project-state.md`. Newest first.
 
+## 2026-11-16 — a dead link sat under a Live tag in production; no gate looked
+
+**What happened.** Production (build `c76b8a8`) showed Risk Analytics as Live,
+linked to `https://risk.forpono.com`, which answers 404. An outside audit
+found it on 2026-11-13; no gate did. `scripts/deploy.sh` checked that the
+page itself answered (root 200, missing page 404, build stamp) and never
+looked at the links the page ships.
+
+**What closes it (branch `fix/site-truth`, not yet deployed).**
+
+- The registry commit (`ddf39db`) moved Risk Analytics to `past` with no
+  `href`, moved Chef Chai to `in-progress` with no `href`, and pointed the
+  founder link at `https://tclum.forpono.com/about`.
+- `scripts/check-links.sh` v1: every distinct http(s) `href` in an `<a>` tag
+  must answer 200 after redirects (15s cap, two attempts); an empty link set is
+  a fail. `--selftest` drives the same extractor, verdict and loop with stub
+  fetchers (five must-pass, six must-fail fixtures).
+- `scripts/deploy.sh` v2: preflight refuses unless the check-links selftest is
+  green; staged gate 4 pipes the staged root body through
+  `check-links.sh --stdin` and refuses promotion on any non-200 link.
+
+**What stays open.** Link rot between deploys. The gate runs only when Tim
+deploys, so a project that goes down the day after a deploy stays linked under
+Live until the next deploy or a manual run. A scheduled run against
+production is an open question in `docs/project-state.md`. The gate also
+passes a link that answers 200 with the wrong content (placeholder or starter
+page); that still needs a human look.
+
+---
+
 ## 2026-09-19 — prebuilt deploy of `1afbf74` took prod down; ruled out; staged remote build is the new deploy path
 
 Incident opened and closed 2026-09-19.

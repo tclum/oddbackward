@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# deploy.sh v1 — staged remote-build deploy for oddbackward.
+# deploy.sh v2 — staged remote-build deploy for oddbackward.
 # The build stamp is injected via --build-env BUILD_STAMP=... so a Vercel remote
 # build (which cannot see .git) still produces a SHA-pinned stamp. Every
 # failure path exits non-zero with a one-line reason so a red gate cannot be
@@ -7,7 +7,7 @@
 
 set -euo pipefail
 
-VERSION="deploy.sh v1"
+VERSION="deploy.sh v2"
 echo "$VERSION"
 
 CLONE_PATH="/Users/timothylum/Desktop/Developer/oddbackward"
@@ -124,6 +124,13 @@ case "$node_v" in
   v22.*) ;;
   *) echo "FAIL: node=$node_v, expected v22.x"; exit 1 ;;
 esac
+# A gate that cannot run cannot fail: prove the link gate alive before relying on it.
+if ! links_selftest=$(bash scripts/check-links.sh --selftest 2>&1); then
+  printf '%s\n' "$links_selftest"
+  echo "FAIL: check-links selftest is red"
+  exit 1
+fi
+echo "check-links selftest: pass"
 
 # ---------- b. clean tree, branch main, HEAD == origin/main after fetch ----------
 if [ -n "$(git status --porcelain)" ]; then
@@ -169,6 +176,8 @@ assert_missing_status "$missing_status" \
   || fail_staged "missing-page /no-such-page-xyz returned $missing_status, expected 404"
 assert_stamp_body "$root_body" "$HEAD_SHA" \
   || fail_staged "root body build-stamp does not start with '$HEAD_SHA ', or contains -dirty/nogit, or the meta tag is missing"
+printf '%s' "$root_body" | bash scripts/check-links.sh --stdin \
+  || fail_staged "an outbound link in the staged page did not answer 200 (see the FAIL line above)"
 
 # ---------- f. promote staged URL to production ----------
 echo "promoting $URL to production..."

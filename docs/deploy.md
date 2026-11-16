@@ -46,7 +46,7 @@ build so the artifact is SHA-pinned even though the Vercel builder cannot see
 The script is the whole deploy. It refuses to run outside the correct clone /
 user / node version, refuses on an unclean tree or a `main` that is not at
 `origin/main`, deploys a **staged** build (`--skip-domain`) with an injected
-build stamp, runs three gates against the staged URL, only then promotes to
+build stamp, runs four gates against the staged URL, only then promotes to
 production, and only then runs `scripts/verify-stamp.sh` against the live
 domain.
 
@@ -62,6 +62,15 @@ The staged gates are:
 3. The body of `/` contains a `<meta name="build-stamp" content="…">` whose
    content starts with the current HEAD short SHA followed by a space, with no
    `-dirty` marker and no `nogit` marker.
+4. Every outbound link in the body of `/` answers 200: the body is piped into
+   `bash scripts/check-links.sh --stdin` (see "Link check" below). Each link
+   prints `OK 200 <url>` or `FAIL <status> <url>` above the staged-failure
+   line, so a red gate names the link.
+
+Before any of this, beside the host and node checks, the script runs
+`bash scripts/check-links.sh --selftest` and refuses with
+`FAIL: check-links selftest is red` if it does not pass: a gate that cannot
+run cannot fail.
 
 Any staged failure prints `STAGED CHECK FAILED, production untouched: <URL>`
 and exits without touching the production domain. On success, the script
@@ -75,7 +84,30 @@ Vercel calls):
 ```bash
 bash scripts/deploy.sh --selftest
 bash scripts/verify-stamp.sh --selftest
+bash scripts/check-links.sh --selftest
 ```
+
+## Link check
+
+`scripts/check-links.sh` checks every distinct `http://` or `https://` `href`
+inside an `<a>` tag (`<link>` tags and `mailto:` are outside the set). Each
+link gets a GET that follows redirects, 15 second cap, up to two attempts, and
+passes only when the final status is exactly 200. An empty link set is a fail.
+The last line is `RESULT: pass` or `RESULT: fail`; exit 0 only on pass.
+
+Run it standalone against production at any time:
+
+```bash
+bash scripts/check-links.sh https://oddbackward.forpono.com
+```
+
+What it cannot see: a link that answers 200 with the wrong content passes. A
+placeholder page, a default framework starter page, or a redirect to an
+unrelated page that answers 200 all look healthy to this gate. Checked
+2026-11-16: against production, the old founder link
+`https://tclum.forpono.com` (redirects to a stock-photo gallery) reported
+`OK 200`. It also only runs at deploy time, so a link that dies between
+deploys stays live until someone runs it by hand.
 
 ## Prebuilt deploys are forbidden
 
