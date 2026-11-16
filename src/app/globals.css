@@ -825,7 +825,7 @@ button.orbit-core:not([aria-disabled="true"]):hover {
   z-index: 1;
   width: min(100%, 1120px);
   margin: 0 auto;
-  padding: 48px max(16px, clamp(18px, 4vw, 40px)) 96px;
+  padding: 48px max(16px, clamp(18px, 4vw, 40px)) 0;
 }
 
 .work-col[data-pillar="Design"] {
@@ -929,6 +929,49 @@ a.work-row:focus-visible .work-name {
   .work-cols {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+/* contact line */
+
+/*
+  One line under the work index, visible without the orbit reveal. Shares the
+  index's max width and horizontal padding so its left edge lines up with the
+  columns; takes over the index's former 96px bottom padding.
+*/
+.contact-line {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 1120px);
+  margin: 0 auto;
+  padding: 28px max(16px, clamp(18px, 4vw, 40px)) 96px;
+  color: rgb(var(--color-ink));
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.contact-line::before {
+  content: "";
+  display: block;
+  margin-bottom: 14px;
+  border-top: 1px solid rgb(var(--color-ink) / 0.13);
+}
+
+.contact-line a {
+  color: rgb(var(--color-brass));
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  overflow-wrap: anywhere;
+}
+
+.contact-line a:hover {
+  text-decoration-thickness: 2px;
+}
+
+.contact-line a:focus-visible {
+  outline: 2px solid rgb(var(--color-brass));
+  outline-offset: 3px;
+  border-radius: 2px;
 }
 
 .sr-only {

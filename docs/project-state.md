@@ -16,6 +16,30 @@ crawlable without interaction, on a provably-current build.
 
 ---
 
+## 2026-11-16 — contact line below the work index, visible without the reveal
+
+Status: **committed, not deployed** — branch `fix/site-truth`.
+
+- The page's only contact link was the "Get in touch" `mailto:` inside the
+  DDO panel. With JavaScript on, that panel opens only after a visitor opens
+  all three pillars and then clicks the center, so a visitor who skipped the
+  reveal never learned how to reach Tim. (The no-JS fallback renders every
+  panel, so crawlers already saw the link.) Tim is sending referred prospects
+  to this page now; a redesign comes later, after a domain move.
+- `src/components/ContactLine.tsx`: new server component rendered right after
+  `<WorkIndex />` in `src/app/page.tsx`. One line, "Making, fixing, or
+  simplifying something? Send the rough version to <address>.", where the
+  address is a `mailto:` link whose text is `siteConfig.contactEmail`. It is
+  in the exported HTML with no JavaScript.
+- `src/app/globals.css`: `.contact-line` shares the work index's max width and
+  horizontal padding, sits under a work-row hairline, uses ink and brass, and
+  gives the link a visible focus outline. The work index's 96px bottom
+  padding moved onto the contact line.
+- Tests: `src/components/ContactLine.test.tsx` (one link, href and text from
+  config, server component, no literal address) and one `page.test.tsx` test
+  (link visible with no interaction, outside every `.info-panel`).
+- The orbit and its reveal are unchanged.
+
 ## 2026-11-16 — registry truth: Risk Analytics past, Chef Chai in progress, founder link to /about
 
 Status: **committed, not deployed** — branch `fix/site-truth`.

@@ -305,6 +305,18 @@ describe("DDO Hawaii Orbit", () => {
     ).toBe(true);
   });
 
+  it("shows the contact line's mailto link with no interaction, outside every info panel", () => {
+    renderHome();
+
+    const contactLinks = [...document.querySelectorAll(".contact-line a")];
+    expect(contactLinks).toHaveLength(1);
+    const [link] = contactLinks;
+    expect(link.getAttribute("href")).toBe(`mailto:${siteConfig.contactEmail}`);
+    expect(link.textContent).toBe(siteConfig.contactEmail);
+    expect(link.closest(".info-panel")).toBeNull();
+    expect(link).toBeVisible();
+  });
+
   it("keeps required brand, legal, and proof config values explicit", () => {
     expect(siteConfig.brandName).toBe("DDO");
     expect(siteConfig.legalName).toBe("DDO");

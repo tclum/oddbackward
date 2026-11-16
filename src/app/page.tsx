@@ -1,3 +1,4 @@
+import { ContactLine } from "@/components/ContactLine";
 import { Orbit } from "@/components/Orbit";
 import { WorkIndex } from "@/components/WorkIndex";
 import { orbitNodes, pillarIds } from "@/data/orbit";
@@ -9,6 +10,7 @@ export default function Home() {
     <main aria-label="DDO">
       <Orbit nodes={orbitNodes} pillarIds={pillarIds} />
       <WorkIndex />
+      <ContactLine />
     </main>
   );
 }
