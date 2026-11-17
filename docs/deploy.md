@@ -13,9 +13,52 @@
 - **Vercel project:** `oddbackward`
 - **Org / team:** `tclum-4994s-projects` (`team_TrPpSMHZ5A2mFcihotFnEirq`)
 - **Project id:** `prj_VXVVD97HWYjKpVpUpHyLVtYb5xCR`
-- **Production domain:** `oddbackward.forpono.com` (also `oddbackward.vercel.app`)
+- **Production domain:** `ddotechsolutions.com` (also `oddbackward.vercel.app`)
 - **Git remote:** `git@github.com:tclum/oddbackward.git` (no Vercel Git hook)
 - **Clone:** `/Users/timothylum/Desktop/Developer/oddbackward`
+
+## Domains
+
+Four hosts point at this project, each with one job:
+
+- `ddotechsolutions.com`: canonical. Serves the site, and is the address
+  `src/config/site.ts` names, so the canonical and Open Graph URLs derive
+  from it.
+- `www.ddotechsolutions.com`: answers 308 to the apex.
+- `oddbackward.forpono.com`: the old address. Serves the site until its
+  redirect is set (below), then answers 308 to the apex so old links keep
+  working.
+- `oddbackward.vercel.app`: Vercel's default domain for the project. Serves
+  the site.
+
+`ddotechsolutions.com` was registered at Cloudflare Registrar on 2026-11-16.
+DNS is Cloudflare's, with two CNAME records, both DNS only (not proxied),
+one at the apex and one for `www`, both pointing at the target the Vercel
+project's domain settings show. Cloudflare answers the apex one with Vercel's
+addresses.
+
+Redirects live on the Vercel project's domain entries (Settings, Domains),
+not in this repo.
+
+The old host stays attached to this project. Removing it breaks every old
+link, because no other project claims that name. Checked 2026-11-16: an
+unclaimed name under `*.forpono.com` resolves to Vercel and fails the TLS
+handshake.
+
+The old host's redirect is Tim's step after the first deploy of the domain
+move commit. Until then, that host serves the site.
+
+Three read-only checks:
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' https://ddotechsolutions.com/
+curl -s -o /dev/null -w '%{http_code} %{redirect_url}\n' https://www.ddotechsolutions.com/
+curl -s -o /dev/null -w '%{http_code} %{redirect_url}\n' https://oddbackward.forpono.com/
+```
+
+They print, in order: `200`; `308 https://ddotechsolutions.com/`; and for the
+old host `200` until its redirect is set, `308 https://ddotechsolutions.com/`
+after.
 
 ## Build
 
@@ -98,7 +141,7 @@ The last line is `RESULT: pass` or `RESULT: fail`; exit 0 only on pass.
 Run it standalone against production at any time:
 
 ```bash
-bash scripts/check-links.sh https://oddbackward.forpono.com
+bash scripts/check-links.sh https://ddotechsolutions.com
 ```
 
 What it cannot see: a link that answers 200 with the wrong content passes. A

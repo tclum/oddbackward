@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# verify-stamp.sh v1 — 2026-08-17
+# verify-stamp.sh v2 — 2026-11-16
 # Compare the deployed page's <meta name="build-stamp"> against local git HEAD.
 # Fails loudly on: unreachable URL, missing meta tag, SHA mismatch, or -dirty
 # marker in the deployed stamp. `--selftest` proves each failure mode fires.
@@ -7,12 +7,12 @@
 # Note: intentionally does NOT use `set -e` inside AND-OR lists — every command
 # whose failure is meaningful captures `rc=$?` and branches on it.
 
-VERSION="verify-stamp.sh v1"
+VERSION="verify-stamp.sh v2"
 echo "$VERSION"
 
 set -u
 
-DEFAULT_URL="https://oddbackward.forpono.com"
+DEFAULT_URL="https://ddotechsolutions.com"
 
 # ---------- extraction + comparison ----------
 # check_stamp_html <label> <html> <expected_sha>

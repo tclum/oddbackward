@@ -5,7 +5,7 @@
 
 ## Destination
 
-`oddbackward.forpono.com` states what DDO is in one screen and shows every
+`ddotechsolutions.com` states what DDO is in one screen and shows every
 public project under Design, Development, Optimization with an honest status,
 crawlable without interaction, on a provably-current build.
 
@@ -16,9 +16,34 @@ crawlable without interaction, on a provably-current build.
 
 ---
 
+## 2026-11-16 — the site moves to its own domain, ddotechsolutions.com
+
+Status: **committed** — branch `chore/own-domain`. Live when the production
+build stamp carries this commit or a later one; `bash scripts/verify-stamp.sh`
+is the proof.
+
+- `src/config/site.ts`: `domain` is `ddotechsolutions.com` and `urls.home` is
+  `https://ddotechsolutions.com`, so the canonical and Open Graph URLs name
+  the new address. The comment above `domain` points at the Domains section
+  of `docs/deploy.md`. The `page.test.tsx` config assertion follows.
+- `scripts/verify-stamp.sh` v2: `DEFAULT_URL` is
+  `https://ddotechsolutions.com`. Nothing else in the script changes.
+- Docs: `docs/deploy.md` names the new production domain, gains a "Domains"
+  section (the hosts and their jobs, DNS, where redirects live, why the old
+  host stays attached, three read-only checks), and its standalone link
+  check targets the new address. `README.md` names the new domain.
+- Outside the repo, Tim registered `ddotechsolutions.com` at Cloudflare
+  Registrar, put it on the Vercel project with `www` redirecting 308 to the
+  apex, and added two DNS-only records (a CNAME at the apex and one for
+  `www`).
+- After the deploy: `oddbackward.forpono.com` becomes a 308 to the apex, and
+  forpono.com's link to the work index gets its own pull request.
+- The contact address stays `tclum@forpono.com` by decision; a contact
+  address on the new domain is an open question below.
+
 ## 2026-11-16 — link-check gate: the deploy refuses a staged page with a dead outbound link
 
-Status: **committed, not deployed** — branch `fix/site-truth`.
+Status: **deployed** — live build stamp `969bd64 2026-11-16T23:09:30Z`, on `main`.
 
 - `https://risk.forpono.com` answered 404 under a Live tag in production until
   an outside audit noticed on 2026-11-13; no gate looked at the links the page
@@ -38,7 +63,7 @@ Status: **committed, not deployed** — branch `fix/site-truth`.
 
 ## 2026-11-16 — contact line below the work index, visible without the reveal
 
-Status: **committed, not deployed** — branch `fix/site-truth`.
+Status: **deployed** — live build stamp `969bd64 2026-11-16T23:09:30Z`, on `main`.
 
 - The page's only contact link was the "Get in touch" `mailto:` inside the
   DDO panel. With JavaScript on, that panel opens only after a visitor opens
@@ -62,7 +87,7 @@ Status: **committed, not deployed** — branch `fix/site-truth`.
 
 ## 2026-11-16 — registry truth: Risk Analytics past, Chef Chai in progress, founder link to /about
 
-Status: **committed, not deployed** — branch `fix/site-truth`.
+Status: **deployed** — live build stamp `969bd64 2026-11-16T23:09:30Z`, on `main`.
 
 - Checked from outside on 2026-11-16 (HST): `https://risk.forpono.com` answers
   404, yet the registry marked Risk Analytics `live` with that `href`, so the
@@ -199,11 +224,16 @@ pillar-panel system, ODD↔DDO glyph morph, held-until-dismissed finale, and a
 
 ## Open questions
 
+- **2026-11-16 — `grilling`: a contact address on the new domain.** Forward
+  an address on `ddotechsolutions.com` through Cloudflare Email Routing (with
+  SPF and DMARC records), or keep `tclum@forpono.com`. Undecided; the site
+  keeps the current address.
 - **2026-11-16 — `grilling`: run `check-links.sh` against production on a
   schedule.** A GitHub Actions cron running
-  `bash scripts/check-links.sh https://oddbackward.forpono.com` would turn a
-  link that dies between deploys red. Recommended after the domain move; not
-  built.
+  `bash scripts/check-links.sh https://ddotechsolutions.com`, plus the three
+  host checks in the Domains section of `docs/deploy.md`, would turn a link
+  or host that dies between deploys red. Recommended after the domain move;
+  not built.
 - **2026-09-19 — `task`: Volta precedes nvm in non-interactive shells.** The
   agent shell starts with Volta's Node 20.14.0 on `PATH` even after `nvm use`
   picks v22.23.2, so `node -v` reports v20 and `npm test` hits

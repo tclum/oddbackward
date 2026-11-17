@@ -323,8 +323,8 @@ describe("DDO Hawaii Orbit", () => {
     expect(siteConfig.legalName).not.toMatch(/\bLLC\b/i);
     expect(siteConfig.contactEmail).toBe("tclum@forpono.com");
     expect(siteConfig.contactEmail).not.toBe("timothy@forpono.com");
-    expect(siteConfig.domain).toBe("oddbackward.forpono.com");
-    expect(siteConfig.urls.home).toBe("https://oddbackward.forpono.com");
+    expect(siteConfig.domain).toBe("ddotechsolutions.com");
+    expect(siteConfig.urls.home).toBe("https://ddotechsolutions.com");
     expect(siteConfig.urls.forpono).toBe("https://forpono.com");
     expect(siteConfig.urls.founder).toBe("https://tclum.forpono.com/about");
 

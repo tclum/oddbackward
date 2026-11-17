@@ -1,11 +1,11 @@
 export const siteConfig = {
   brandName: "DDO",
   legalName: "DDO",
-  // Flip domain and home to oddbackward.com once that domain is live.
-  domain: "oddbackward.forpono.com",
+  // Where this address is served and redirected from: docs/deploy.md, "Domains".
+  domain: "ddotechsolutions.com",
   contactEmail: "tclum@forpono.com",
   urls: {
-    home: "https://oddbackward.forpono.com",
+    home: "https://ddotechsolutions.com",
     forpono: "https://forpono.com",
     founder: "https://tclum.forpono.com/about",
   },

@@ -1,6 +1,6 @@
 # DDO
 
-Standalone marketing site for DDO at `oddbackward.com`.
+Standalone marketing site for DDO at `ddotechsolutions.com`.
 
 ## Stack
 
