@@ -13,8 +13,57 @@ crawlable without interaction, on a provably-current build.
 
 - **Prebuilt deploys.** Ruled out 2026-09-19 (see
   `docs/findings-deploy.md`). `bash scripts/deploy.sh` is the single deploy path.
+- **The orbit.** The orbit reveal, its finale and the portfolio-code overlay
+  were retired by Tim on 2026-11-17 for a page a referred client can read
+  without playing it.
 
 ---
+
+## 2026-11-17 — the home page becomes a services-and-work index
+
+Status: **committed** — branch `feat/redesign-index`. Live when the production
+build stamp carries this commit or a later one; `bash scripts/verify-stamp.sh`
+is the proof.
+
+- Tim is sending referred clients to `ddotechsolutions.com`. On 2026-11-17 he
+  chose a redesign from five mockups and edited its copy himself. The page
+  stops being an orbit you play with and becomes a page you read top to
+  bottom: header, hero, services, work, about, contact, footer.
+- Tim's decisions, all built in: the contact address is
+  `tim@ddotechsolutions.com`; the header says "DDO Tech Solutions", the footer
+  says "© <year> DDO LLC, Honolulu, Hawaiʻi", and body copy says "DDO"; the
+  audience is "teams", with no size attached; the orbit, its reveal, its
+  finale and the `:)` portfolio-code overlay retire.
+- `src/config/site.ts`: `brandName` "DDO Tech Solutions", new `shortName`
+  "DDO", `legalName` "DDO LLC", new `location` "Honolulu, Hawaiʻi",
+  `contactEmail` `tim@ddotechsolutions.com`. `domain` and `urls` unchanged.
+- `src/app/layout.tsx`: description "Websites, tools, and less busywork for
+  Hawaiʻi's teams." in metadata and Open Graph; Bricolage Grotesque (variable,
+  with its optical-size axis; the CSS uses weights 500 and 700) and Inter (400,
+  500, 600) through `next/font/google` as `--font-display` and `--font-sans`; the inline `js`-class script is gone (nothing reads it).
+  `src/test/setup.ts` mocks `next/font/google` for tests.
+- `src/app/globals.css` and `tailwind.config.ts`: the orbit palette and styles
+  are replaced by the new twelve tokens (canvas, ink, muted, line, surface,
+  accent, accent-strong, warn, quiet, grid, grid-dark, on-dark-muted) and only
+  the styles the new page uses.
+- Components: `SiteHeader`, `Hero`, `HeroGraphic` (client), `Services` with
+  `ServicePictogram`, `WorkIndex` (new row markup with a status dot, same
+  contract), `About`, `ContactPanel` (client), `SiteFooter`. New
+  `src/data/services.ts` holds the services copy, ordered by `pillars`.
+  `ContactLine` and its test are deleted; `ContactPanel` replaces it.
+- Motion: the hero's ring marker points at the mouse, the two D shapes drift
+  up to 7 units and an accent glow follows; the contact panel gets an accent
+  spotlight; rows, pictograms and the three buttons have hover moves. Writes go
+  through refs at most once per animation frame; reduced motion and non-mouse
+  pointers leave everything at rest.
+- Tests: `src/app/page.test.tsx` is rewritten for the new page (config, outbound
+  and mailto links, no typed address in any app or component file, section
+  order, services order, brand wording, static HTML, accessibility); the orbit
+  tests retire with the orbit. New `ContactPanel.test.tsx`. `WorkIndex.test.tsx`
+  and `projects.test.ts` are unchanged.
+- The registry (`src/data/projects.ts`, `src/data/work.ts`) is not touched.
+- `src/components/Orbit.tsx`, `src/data/orbit.ts` and `src/data/portfolio.ts`
+  stay on disk, unimported, until the next commit deletes them.
 
 ## 2026-11-16 — the site moves to its own domain, ddotechsolutions.com
 
@@ -224,10 +273,10 @@ pillar-panel system, ODD↔DDO glyph morph, held-until-dismissed finale, and a
 
 ## Open questions
 
-- **2026-11-16 — `grilling`: a contact address on the new domain.** Forward
-  an address on `ddotechsolutions.com` through Cloudflare Email Routing (with
-  SPF and DMARC records), or keep `tclum@forpono.com`. Undecided; the site
-  keeps the current address.
+- **2026-11-17 — `task`: send as the new address.** Mail to
+  `tim@ddotechsolutions.com` is forwarded by Cloudflare Email Routing, and
+  replies leave from the forpono inbox until sending from the new address is
+  set up.
 - **2026-11-16 — `grilling`: run `check-links.sh` against production on a
   schedule.** A GitHub Actions cron running
   `bash scripts/check-links.sh https://ddotechsolutions.com`, plus the three
@@ -246,5 +295,4 @@ pillar-panel system, ODD↔DDO glyph morph, held-until-dismissed finale, and a
 
 ## Accepted gaps
 
-- Featured projects show their summary twice in an orbit panel. Panel
-  restructure is unscheduled.
+- None as of 2026-11-17.

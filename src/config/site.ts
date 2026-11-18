@@ -1,9 +1,11 @@
 export const siteConfig = {
-  brandName: "DDO",
-  legalName: "DDO",
+  brandName: "DDO Tech Solutions",
+  shortName: "DDO",
+  legalName: "DDO LLC",
+  location: "Honolulu, Hawaiʻi",
   // Where this address is served and redirected from: docs/deploy.md, "Domains".
   domain: "ddotechsolutions.com",
-  contactEmail: "tclum@forpono.com",
+  contactEmail: "tim@ddotechsolutions.com",
   urls: {
     home: "https://ddotechsolutions.com",
     forpono: "https://forpono.com",

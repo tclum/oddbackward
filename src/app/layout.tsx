@@ -1,17 +1,34 @@
 import type { Metadata } from "next";
+import { Bricolage_Grotesque, Inter } from "next/font/google";
 import "./globals.css";
 import { siteConfig } from "@/config/site";
 
+const display = Bricolage_Grotesque({
+  subsets: ["latin"],
+  weight: "variable",
+  axes: ["opsz"],
+  variable: "--font-display",
+  display: "swap",
+});
+
+const sans = Inter({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  variable: "--font-sans",
+  display: "swap",
+});
+
+const title = `${siteConfig.brandName} | Design. Development. Optimization.`;
+const description = "Websites, tools, and less busywork for Hawaiʻi's teams.";
+
 export const metadata: Metadata = {
   metadataBase: new URL(siteConfig.urls.home),
-  title: `${siteConfig.brandName} | Design. Development. Optimization.`,
-  description:
-    "Custom websites, apps, and workflow improvements for small businesses and teams.",
+  title,
+  description,
   alternates: { canonical: "/" },
   openGraph: {
-    title: `${siteConfig.brandName} | Design. Development. Optimization.`,
-    description:
-      "Custom websites, apps, and workflow improvements for small businesses and teams.",
+    title,
+    description,
     url: siteConfig.urls.home,
     siteName: siteConfig.brandName,
     type: "website",
@@ -27,20 +44,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body>
-        {/*
-          Progressive-enhancement flag: marks <html> as JS-capable before paint so
-          the panels render as dialogs. Without JS the class is never added and the
-          panels stay as a static, readable fallback (see globals.css).
-        */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: "document.documentElement.classList.add('js')",
-          }}
-        />
-        {children}
-      </body>
+    <html lang="en" className={`${display.variable} ${sans.variable}`}>
+      <body>{children}</body>
     </html>
   );
 }

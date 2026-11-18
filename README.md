@@ -23,8 +23,9 @@ npm run build
 
 Shared site values live in `src/config/site.ts`.
 
-Selected work and pillar proof points live in `src/data/work.ts`.
+The project registry lives in `src/data/projects.ts`; the work index and the
+pillar statements read it through `src/data/work.ts`.
 
-The visual system is intentionally neutral and tokenized in `src/app/globals.css` and
-`tailwind.config.ts` so final art direction can be swapped later without rewriting
-components.
+The services copy lives in `src/data/services.ts`.
+
+Colors are tokens in `src/app/globals.css` and `tailwind.config.ts`.
