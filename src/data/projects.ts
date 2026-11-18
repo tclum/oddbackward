@@ -65,6 +65,15 @@ export const projects: Project[] = [
     detail: "Interactive storefront demo. No real orders.",
     href: "https://kailani.forpono.com",
   },
+  {
+    slug: "vows-with-tony",
+    name: "Vows with Tony",
+    pillar: "Design",
+    status: "live",
+    summary: "A site for a wedding officiant and planner in Reno and Lake Tahoe.",
+    detail: "Packages, reviews, a gallery and a booking inquiry form.",
+    href: "https://vowswithtony.forpono.com",
+  },
 
   // Development
   {

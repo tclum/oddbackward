@@ -19,6 +19,26 @@ crawlable without interaction, on a provably-current build.
 
 ---
 
+## 2026-11-18 — Vows with Tony joins the registry
+
+Status: **committed** — branch `feat/redesign-index`. Live when the production
+build stamp carries this commit or a later one; `bash scripts/verify-stamp.sh`
+is the proof.
+
+- Tim built a site for Vows with Tony, a wedding officiant and planner in Reno
+  and Lake Tahoe, and on 2026-11-18 said it is live and belongs on the DDO
+  site.
+- `src/data/projects.ts`: one new entry at the end of the Design group, after
+  Kailani. `slug` `vows-with-tony`, `name` "Vows with Tony", `pillar` Design,
+  `status` `live`, `summary` "A site for a wedding officiant and planner in
+  Reno and Lake Tahoe.", `detail` "Packages, reviews, a gallery and a booking
+  inquiry form.", `href` `https://vowswithtony.forpono.com`. No other entry
+  changes; the work index renders the row from the registry.
+- Checked 2026-11-18: `https://vowswithtony.forpono.com/` answers 200.
+- Checked 2026-11-17: the site carried `noindex, nofollow`, which keeps it out
+  of search results and does not affect a direct link.
+- The link check now covers 8 links.
+
 ## 2026-11-17 — the home page becomes a services-and-work index
 
 Status: **committed** — branch `feat/redesign-index`. Live when the production
