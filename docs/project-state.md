@@ -64,6 +64,10 @@ is the proof.
 - The registry (`src/data/projects.ts`, `src/data/work.ts`) is not touched.
 - `src/components/Orbit.tsx`, `src/data/orbit.ts` and `src/data/portfolio.ts`
   stay on disk, unimported, until the next commit deletes them.
+- The next commit deletes `src/components/Orbit.tsx`, `src/data/orbit.ts`,
+  `src/data/portfolio.ts` and `public/images/studio-workbench.png`, removes
+  the `lucide-react` dependency, and drops `selectedWork`, `WorkItem` and the
+  registry's `featured` flag, which only the orbit read.
 
 ## 2026-11-16 — the site moves to its own domain, ddotechsolutions.com
 

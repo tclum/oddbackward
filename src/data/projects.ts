@@ -1,8 +1,8 @@
 import type { Pillar } from "@/data/work";
 
 /*
-  Single source of project facts. Every proof and every selected-work entry is
-  derived from this array — nothing else in the tree hardcodes a project name,
+  Single source of project facts. Every proof in the work index is derived
+  from this array — nothing else in the tree hardcodes a project name,
   URL, or status. The invariant `href present iff status === "live"` is asserted
   in projects.test.ts so a linkable in-progress entry cannot ship.
 */
@@ -17,7 +17,6 @@ export type Project = {
   summary: string;
   detail: string;
   href?: string;
-  featured?: boolean;
 };
 
 export const projects: Project[] = [
@@ -30,7 +29,6 @@ export const projects: Project[] = [
     summary: "A website builder for Hawaiʻi small businesses.",
     detail: "Multi-tenant and white-label. One platform, many sites.",
     href: "https://forpono.com",
-    featured: true,
   },
   {
     slug: "bikini-n-beanz",
@@ -77,7 +75,6 @@ export const projects: Project[] = [
     summary: "Questions answered from Hawaiʻi's public broadband documents.",
     detail: "Every answer carries its verbatim source.",
     href: "https://bead.forpono.com",
-    featured: true,
   },
   {
     slug: "risk-analytics",
@@ -121,7 +118,6 @@ export const projects: Project[] = [
     status: "in-progress",
     summary: "One input. Flyer, post, email.",
     detail: "Flyer, social post, and email from the same source.",
-    featured: true,
   },
   {
     slug: "pace-bot",
@@ -130,6 +126,5 @@ export const projects: Project[] = [
     status: "past",
     summary: "A voice guide for questions and answers.",
     detail: "Built for a university program. No longer running.",
-    featured: true,
   },
 ];

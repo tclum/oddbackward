@@ -15,14 +15,6 @@ export type PillarBlock = {
   proofs: Proof[];
 };
 
-export type WorkItem = {
-  title: string;
-  pillar: Pillar;
-  summary: string;
-  detail: string;
-  href?: string;
-};
-
 const PILLAR_STATEMENTS: Record<Pillar, string> = {
   Design: "Sites that fit the business.",
   Development: "Apps, dashboards, and tools for the real workflow.",
@@ -51,13 +43,3 @@ export const pillars: PillarBlock[] = PILLAR_ORDER.map((pillar) => ({
       href: project.href,
     })),
 }));
-
-export const selectedWork: WorkItem[] = projects
-  .filter((project) => project.featured)
-  .map((project) => ({
-    title: project.name,
-    pillar: project.pillar,
-    summary: project.summary,
-    detail: project.detail,
-    href: project.href,
-  }));
